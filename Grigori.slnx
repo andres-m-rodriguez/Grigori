@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Grigori.Core/Grigori.Core.csproj" />
+    <Project Path="src/Grigori.Mcp/Grigori.Mcp.csproj" />
+    <Project Path="src/Grigori.Api/Grigori.Api.csproj" />
+  </Folder>
+</Solution>
