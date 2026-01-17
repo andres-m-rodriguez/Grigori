@@ -1,8 +1,10 @@
-using Grigori.Api.Endpoints;
-using Grigori.Core.Embeddings;
-using Grigori.Core.Indexing;
-using Grigori.Core.Search;
-using Grigori.Core.Storage;
+using Grigori.Api.Features.Index;
+using Grigori.Api.Features.Search;
+using Grigori.Contracts.Interfaces;
+using Grigori.Contracts.Options;
+using Grigori.Database.Extensions;
+using Grigori.DataAccess.Extensions;
+using Grigori.Infrastructure.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,15 +12,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("appsettings.json", optional: true);
 
 // Configure options
-builder.Services.Configure<GrigoriOptions>(builder.Configuration.GetSection("Grigori"));
+builder.Services.Configure<GrigoriOptions>(builder.Configuration.GetSection(GrigoriOptions.SectionName));
 
-// Register core services
-builder.Services.AddSingleton<VectorStore>();
-builder.Services.AddSingleton<IEmbeddingProvider, VoyageEmbeddings>();
-builder.Services.AddSingleton<RoslynCodeChunker>();
-builder.Services.AddSingleton<CodeChunker>();
-builder.Services.AddSingleton<FileWatcher>();
-builder.Services.AddSingleton<SemanticSearch>();
+// Add layers following dependency graph
+builder.Services.AddGrigoriDatabase();         // Database layer
+builder.Services.AddGrigoriDataAccess();       // DataAccess layer
+builder.Services.AddGrigoriInfrastructure();   // Infrastructure layer
+
+// Add feature services
+builder.Services.AddSingleton<ISearchService, SearchService>();
+builder.Services.AddSingleton<IIndexService, IndexService>();
 
 // Add OpenAPI
 builder.Services.AddEndpointsApiExplorer();
@@ -32,11 +35,28 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-// Map endpoints
-app.MapIndexEndpoints();
+// Map feature endpoints
 app.MapSearchEndpoints();
+app.MapIndexEndpoints();
 
 // Health check
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
+    .WithTags("Health")
+    .WithOpenApi();
+
+// Metrics endpoint
+app.MapGet("/api/metrics", (IMetricsService metricsService, bool reset = false) =>
+{
+    var snapshot = metricsService.GetSnapshot();
+    if (reset)
+    {
+        metricsService.Reset();
+    }
+    return Results.Ok(snapshot);
+})
+.WithTags("Metrics")
+.WithOpenApi()
+.WithName("GetMetrics")
+.WithDescription("Get accumulated metrics");
 
 app.Run();

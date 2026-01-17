@@ -1,50 +1,98 @@
-using Grigori.Core.Embeddings;
-using Grigori.Core.Indexing;
-using Grigori.Core.Metrics;
-using Grigori.Core.Search;
-using Grigori.Core.Storage;
-using Grigori.Mcp;
-using Grigori.Mcp.Tools;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Grigori.Contracts.Interfaces;
+using Grigori.Contracts.Options;
+using Grigori.Database;
+using Grigori.Database.Extensions;
+using Grigori.DataAccess.Extensions;
+using Grigori.Infrastructure.Extensions;
+using Grigori.Infrastructure.Indexing;
+using Grigori.Mcp.Dashboard.Components;
+using Grigori.Mcp.Dashboard.Services;
+using Grigori.Mcp.Features.Benchmark.Endpoints;
+using Grigori.Mcp.Features.Benchmark.Services;
+using Grigori.Mcp.Features.Index.Endpoints;
+using Grigori.Mcp.Features.Index.Services;
+using Grigori.Mcp.Features.Metrics.Endpoints;
+using Grigori.Mcp.Features.Search.Endpoints;
+using Grigori.Mcp.Features.Search.Services;
 using ModelContextProtocol.Server;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
-// Add configuration - use full path since working directory may vary
-var projectDir = Path.GetDirectoryName(typeof(Program).Assembly.Location) ?? AppContext.BaseDirectory;
+// Check if running in MCP mode (default) or dashboard-only mode
+var dashboardOnly = args.Contains("--dashboard");
+var dashboardPort = builder.Configuration.GetValue("Grigori:Dashboard:Port", 5151);
+
+// Add configuration
+var projectDir = AppContext.BaseDirectory;
 builder.Configuration.AddJsonFile(Path.Combine(projectDir, "appsettings.json"), optional: true);
 
 // Configure options
-builder.Services.Configure<GrigoriOptions>(builder.Configuration.GetSection("Grigori"));
+builder.Services.Configure<GrigoriOptions>(builder.Configuration.GetSection(GrigoriOptions.SectionName));
 
-// Register core services
-builder.Services.AddSingleton<VectorStore>();
-builder.Services.AddSingleton(SearchMetrics.Instance);
+// Add layers following dependency graph
+builder.Services.AddGrigoriDatabase();         // Database layer
+builder.Services.AddGrigoriDataAccess();       // DataAccess layer
+builder.Services.AddGrigoriInfrastructure();   // Infrastructure layer
 
-// Register embedding provider based on configuration
-var embeddingProvider = builder.Configuration.GetSection("Grigori")["EmbeddingProvider"] ?? "onnx";
-if (embeddingProvider.Equals("voyage", StringComparison.OrdinalIgnoreCase))
-    builder.Services.AddSingleton<IEmbeddingProvider, VoyageEmbeddings>();
+// Add feature services
+builder.Services.AddSingleton<ISearchService, SearchService>();
+builder.Services.AddSingleton<IIndexService, IndexService>();
+builder.Services.AddSingleton<BenchmarkService>();
+
+// Dashboard services
+builder.Services.AddScoped<DashboardService>();
+
+// Add Blazor services
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+
+if (!dashboardOnly)
+{
+    // Register MCP tool endpoints
+    builder.Services.AddScoped<SearchEndpoints>();
+    builder.Services.AddScoped<IndexEndpoints>();
+    builder.Services.AddScoped<MetricsEndpoints>();
+    builder.Services.AddScoped<BenchmarkEndpoints>();
+
+    // Register MCP server with stdio transport
+    builder.Services
+        .AddMcpServer()
+        .WithStdioServerTransport()
+        .WithToolsFromAssembly();
+}
+
+// Configure Kestrel for dashboard
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenLocalhost(dashboardPort);
+});
+
+var app = builder.Build();
+
+// Redirect root to dashboard (before path base)
+app.MapGet("/", () => Results.Redirect("/dashboard"));
+
+// Configure Blazor dashboard at /dashboard path
+app.UsePathBase("/dashboard");
+app.UseStaticFiles();
+app.UseAntiforgery();
+
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
+if (dashboardOnly)
+{
+    Console.WriteLine($"Grigori Dashboard running at http://localhost:{dashboardPort}/dashboard");
+    await app.RunAsync();
+}
 else
-    builder.Services.AddSingleton<IEmbeddingProvider, OnnxEmbeddings>();
-builder.Services.AddSingleton<RoslynCodeChunker>();
-builder.Services.AddSingleton<CodeChunker>();
-builder.Services.AddSingleton<FileWatcher>();
-builder.Services.AddSingleton<SemanticSearch>();
+{
+    // Run both MCP and dashboard
+    Console.Error.WriteLine($"Grigori MCP Server started. Dashboard at http://localhost:{dashboardPort}/dashboard");
 
-// Register tool classes for DI
-builder.Services.AddScoped<IndexTool>();
-builder.Services.AddScoped<SearchTool>();
-builder.Services.AddScoped<BenchmarkTool>();
-builder.Services.AddScoped<MetricsTool>();
+    // Start the web server in background
+    _ = Task.Run(() => app.RunAsync());
 
-// Register MCP server with tools
-builder.Services
-    .AddMcpServer()
-    .WithStdioServerTransport()
-    .WithToolsFromAssembly();
-
-var host = builder.Build();
-await host.RunAsync();
+    // The MCP server runs via the hosted service registered by AddMcpServer
+    await Task.Delay(Timeout.Infinite);
+}

@@ -1,0 +1,110 @@
+@page "/dashboard/search"
+@inject DashboardService DashboardService
+
+<PageTitle>Search - Grigori</PageTitle>
+
+<h1 class="page-title">Semantic Search</h1>
+
+<div class="search-container">
+    <div class="search-box">
+        <input type="text"
+               class="search-input"
+               placeholder="Search code semantically... (e.g., 'function that handles user authentication')"
+               @bind="_query"
+               @bind:event="oninput"
+               @onkeydown="HandleKeyDown" />
+        <button class="search-btn" @onclick="SearchAsync" disabled="@_searching">
+            @if (_searching)
+            {
+                <span>Searching...</span>
+            }
+            else
+            {
+                <span>Search</span>
+            }
+        </button>
+    </div>
+</div>
+
+@if (_searching)
+{
+    <div class="loading">
+        <div class="spinner"></div>
+        <span>Searching...</span>
+    </div>
+}
+else if (_results != null)
+{
+    @if (_results.Count > 0)
+    {
+        <div class="results-header">
+            <span>Found @_results.Count result(s) in @_searchDuration.TotalMilliseconds.ToString("F0")ms</span>
+        </div>
+
+        @foreach (var result in _results)
+        {
+            <div class="result-card">
+                <div class="result-header">
+                    <span class="result-path">@result.FilePath</span>
+                    <span class="result-score">@result.FormattedScore</span>
+                </div>
+                <div class="result-content">
+                    <pre class="result-code">@result.Content</pre>
+                    <div class="result-lines">@result.LineRange</div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">🔍</div>
+            <p>No results found</p>
+            <p class="info-text">Try a different search query</p>
+        </div>
+    }
+}
+else
+{
+    <div class="empty-state">
+        <div class="empty-state-icon">🔎</div>
+        <p>Enter a query to search</p>
+        <p class="info-text">Use natural language to describe what you're looking for</p>
+    </div>
+}
+
+@code {
+    private string _query = string.Empty;
+    private List<SearchResult>? _results;
+    private bool _searching;
+    private TimeSpan _searchDuration;
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !_searching)
+        {
+            await SearchAsync();
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_query) || _searching)
+            return;
+
+        _searching = true;
+        _results = null;
+
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            _results = await DashboardService.SearchAsync(_query, 10);
+            sw.Stop();
+            _searchDuration = sw.Elapsed;
+        }
+        finally
+        {
+            _searching = false;
+        }
+    }
+}

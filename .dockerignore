@@ -1,0 +1,60 @@
+# =============================================================================
+# Grigori - Docker Ignore
+# =============================================================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vs
+.vscode
+.idea
+*.user
+*.suo
+
+# Build outputs
+**/bin
+**/obj
+**/out
+**/publish
+
+# Test results
+**/TestResults
+**/coverage
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Docker files (don't copy into context recursively)
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Local development
+*.local
+.env
+.env.*
+appsettings.*.json
+!appsettings.json
+
+# Database and index files
+*.db
+*.db-journal
+*.hnsw
+grigori.db
+grigori.hnsw
+
+# Models (downloaded separately)
+*.onnx
+models/
+
+# Misc
+*.log
+*.tmp
+nul
+Thumbs.db
+.DS_Store

@@ -1,0 +1,26 @@
+@inherits LayoutComponentBase
+
+<div class="layout">
+    <header class="header">
+        <div class="logo">
+            <span class="logo-icon">◈</span>
+            <span class="logo-text">Grigori</span>
+        </div>
+        <nav class="nav">
+            <NavLink class="nav-link" href="/dashboard" Match="NavLinkMatch.All">
+                Dashboard
+            </NavLink>
+            <NavLink class="nav-link" href="/dashboard/search">
+                Search
+            </NavLink>
+        </nav>
+    </header>
+
+    <main class="main">
+        @Body
+    </main>
+
+    <footer class="footer">
+        <span>Grigori MCP Server</span>
+    </footer>
+</div>

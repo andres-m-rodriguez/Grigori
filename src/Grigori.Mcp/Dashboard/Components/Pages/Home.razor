@@ -1,0 +1,116 @@
+@page "/dashboard"
+@inject DashboardService DashboardService
+
+<PageTitle>Grigori Dashboard</PageTitle>
+
+<h1 class="page-title">Index Overview</h1>
+
+@if (_loading)
+{
+    <div class="loading">
+        <div class="spinner"></div>
+        <span>Loading stats...</span>
+    </div>
+}
+else if (_stats != null)
+{
+    <div class="stats-grid">
+        <div class="stat-card accent">
+            <div class="stat-value">@_stats.TotalChunks.ToString("N0")</div>
+            <div class="stat-label">Code Chunks</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-value">@_stats.TotalFiles.ToString("N0")</div>
+            <div class="stat-label">Files Indexed</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-value">@_stats.FormattedSize</div>
+            <div class="stat-label">Index Size</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-value">@(_stats.HnswBuilt ? "Active" : "Inactive")</div>
+            <div class="stat-label">HNSW Index</div>
+        </div>
+    </div>
+
+    <div class="stat-card" style="margin-bottom: 1rem;">
+        <div class="info-text">
+            <strong>Last Updated:</strong> @_stats.FormattedLastUpdated
+        </div>
+        @if (_stats.HnswBuilt)
+        {
+            <div class="info-text success" style="margin-top: 0.5rem;">
+                HNSW index contains @_stats.HnswVectorCount.ToString("N0") vectors
+            </div>
+        }
+        else
+        {
+            <div class="info-text warning" style="margin-top: 0.5rem;">
+                HNSW index not built - using linear search
+            </div>
+        }
+    </div>
+
+    @if (_projects.Count > 0)
+    {
+        <h2 class="section-title">Indexed Projects</h2>
+        <div class="projects-list">
+            @foreach (var project in _projects)
+            {
+                <div class="project-card">
+                    <div class="project-header">
+                        <span class="project-icon">📁</span>
+                        <span class="project-name">@project.Name</span>
+                    </div>
+                    <div class="project-path">@project.Path</div>
+                    <div class="project-stats">
+                        <span class="project-stat">
+                            <strong>@project.FileCount.ToString("N0")</strong> files
+                        </span>
+                        <span class="project-stat">
+                            <strong>@project.ChunkCount.ToString("N0")</strong> chunks
+                        </span>
+                    </div>
+                    <div class="project-extensions">@project.ExtensionsSummary</div>
+                    <div class="project-updated">Last indexed: @project.FormattedLastIndexed</div>
+                </div>
+            }
+        </div>
+    }
+}
+else
+{
+    <div class="empty-state">
+        <div class="empty-state-icon">📂</div>
+        <p>No index data available</p>
+        <p class="info-text">Index a directory to get started</p>
+    </div>
+}
+
+@code {
+    private IndexStats? _stats;
+    private List<IndexedProject> _projects = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatsAsync();
+    }
+
+    private async Task LoadStatsAsync()
+    {
+        _loading = true;
+        try
+        {
+            _stats = await DashboardService.GetIndexStatsAsync();
+            _projects = await DashboardService.GetIndexedProjectsAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

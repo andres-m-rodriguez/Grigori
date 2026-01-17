@@ -1,6 +1,9 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Grigori.Core/Grigori.Core.csproj" />
+    <Project Path="src/Grigori.Contracts/Grigori.Contracts.csproj" />
+    <Project Path="src/Grigori.Database/Grigori.Database.csproj" />
+    <Project Path="src/Grigori.DataAccess/Grigori.DataAccess.csproj" />
+    <Project Path="src/Grigori.Infrastructure/Grigori.Infrastructure.csproj" />
     <Project Path="src/Grigori.Mcp/Grigori.Mcp.csproj" />
     <Project Path="src/Grigori.Api/Grigori.Api.csproj" />
   </Folder>

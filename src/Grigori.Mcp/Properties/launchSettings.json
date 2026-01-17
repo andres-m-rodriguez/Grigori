@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Grigori.Mcp": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:65207;http://localhost:65208"
+    }
+  }
+}

@@ -1,0 +1,86 @@
+# =============================================================================
+# Grigori MCP Server - Docker Compose
+# =============================================================================
+# Usage:
+#   Full image (model baked in):
+#     docker compose up grigori-full
+#
+#   Slim image (downloads model on first run):
+#     docker compose up grigori-slim
+#
+#   Build both images:
+#     docker compose build
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Full Image - Model baked in, zero startup delay
+  # ---------------------------------------------------------------------------
+  grigori-full:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: full
+    image: grigori:full
+    container_name: grigori-full
+    volumes:
+      # Persist the search index between restarts
+      - grigori-index:/data/index
+      # Mount your codebase for indexing (read-only)
+      - ${CODEBASE_PATH:-./}:/workspace:ro
+    environment:
+      - GRIGORI__WATCHEDDIRECTORIES__0=/workspace
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Slim Image - Downloads model on first run, smaller image
+  # ---------------------------------------------------------------------------
+  grigori-slim:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: slim
+    image: grigori:slim
+    container_name: grigori-slim
+    volumes:
+      # Persist models and index between restarts
+      - grigori-data:/data
+      # Mount your codebase for indexing (read-only)
+      - ${CODEBASE_PATH:-./}:/workspace:ro
+    environment:
+      - GRIGORI__WATCHEDDIRECTORIES__0=/workspace
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Development - Build from source with hot reload
+  # ---------------------------------------------------------------------------
+  grigori-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    image: grigori:dev
+    container_name: grigori-dev
+    working_dir: /src
+    volumes:
+      - .:/src:ro
+      - grigori-dev-data:/data
+      - ${CODEBASE_PATH:-./}:/workspace:ro
+    environment:
+      - DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true
+      - GRIGORI__WATCHEDDIRECTORIES__0=/workspace
+    command: dotnet watch run --project src/Grigori.Mcp/Grigori.Mcp.csproj
+    stdin_open: true
+    tty: true
+
+volumes:
+  grigori-index:
+    name: grigori-index
+  grigori-data:
+    name: grigori-data
+  grigori-dev-data:
+    name: grigori-dev-data
