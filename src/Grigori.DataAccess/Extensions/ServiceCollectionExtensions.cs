@@ -9,6 +9,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddGrigoriDataAccess(this IServiceCollection services)
     {
         services.AddSingleton<IChunkRepository, ChunkRepository>();
+        services.AddSingleton<IMentalNoteRepository, MentalNoteRepository>();
         return services;
     }
 }

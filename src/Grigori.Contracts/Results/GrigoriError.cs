@@ -53,6 +53,9 @@ public readonly record struct GrigoriError
     public static GrigoriError Unknown(string message, Exception? ex = null) =>
         new(GrigoriErrorCode.Unknown, message, exception: ex);
 
+    public static GrigoriError NotFound(string resource, string identifier) =>
+        new(GrigoriErrorCode.NotFound, $"{resource} not found: {identifier}", identifier);
+
     public override string ToString() => Details is not null
         ? $"[{Code}] {Message} (Details: {Details})"
         : $"[{Code}] {Message}";
@@ -73,5 +76,6 @@ public enum GrigoriErrorCode
     DatabaseError,
     ChunkingError,
     ValidationError,
-    ConfigurationError
+    ConfigurationError,
+    NotFound
 }

@@ -77,6 +77,22 @@ public class GrigoriDbContext : IDisposable, IAsyncDisposable
             );
 
             CREATE INDEX IF NOT EXISTS idx_search_history_timestamp ON search_history(timestamp);
+
+            CREATE TABLE IF NOT EXISTS mental_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_name TEXT NOT NULL,
+                category INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                tags TEXT,
+                priority INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_mental_notes_project ON mental_notes(project_name);
+            CREATE INDEX IF NOT EXISTS idx_mental_notes_category ON mental_notes(project_name, category);
+            CREATE INDEX IF NOT EXISTS idx_mental_notes_priority ON mental_notes(project_name, priority DESC);
             """;
         cmd.ExecuteNonQuery();
 
@@ -515,6 +531,251 @@ public class GrigoriDbContext : IDisposable, IAsyncDisposable
         }
 
         return metrics;
+    }
+
+    #endregion
+
+    #region Mental Notes Methods
+
+    public async Task<long> InsertMentalNoteAsync(
+        string projectName,
+        int category,
+        string title,
+        string content,
+        string? tags,
+        int priority,
+        CancellationToken cancellationToken = default)
+    {
+        await using var cmd = _connection.CreateCommand();
+        var now = DateTime.UtcNow.ToString("O");
+        cmd.CommandText = """
+            INSERT INTO mental_notes (project_name, category, title, content, tags, priority, created_at, updated_at)
+            VALUES (@projectName, @category, @title, @content, @tags, @priority, @createdAt, @updatedAt);
+            SELECT last_insert_rowid();
+            """;
+
+        cmd.Parameters.AddWithValue("@projectName", projectName);
+        cmd.Parameters.AddWithValue("@category", category);
+        cmd.Parameters.AddWithValue("@title", title);
+        cmd.Parameters.AddWithValue("@content", content);
+        cmd.Parameters.AddWithValue("@tags", (object?)tags ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@priority", priority);
+        cmd.Parameters.AddWithValue("@createdAt", now);
+        cmd.Parameters.AddWithValue("@updatedAt", now);
+
+        var result = await cmd.ExecuteScalarAsync(cancellationToken);
+        return (long)result!;
+    }
+
+    public async Task<Models.MentalNote?> GetMentalNoteByIdAsync(
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, project_name, category, title, content, tags, priority, created_at, updated_at
+            FROM mental_notes
+            WHERE id = @id
+            """;
+        cmd.Parameters.AddWithValue("@id", id);
+
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        if (await reader.ReadAsync(cancellationToken))
+        {
+            return ReadMentalNote(reader);
+        }
+        return null;
+    }
+
+    public async Task<List<Models.MentalNote>> GetMentalNotesByProjectAsync(
+        string projectName,
+        CancellationToken cancellationToken = default)
+    {
+        var notes = new List<Models.MentalNote>();
+
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, project_name, category, title, content, tags, priority, created_at, updated_at
+            FROM mental_notes
+            WHERE project_name = @projectName
+            ORDER BY priority DESC, created_at DESC
+            """;
+        cmd.Parameters.AddWithValue("@projectName", projectName);
+
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            notes.Add(ReadMentalNote(reader));
+        }
+
+        return notes;
+    }
+
+    public async Task<List<Models.MentalNote>> GetMentalNotesByCategoryAsync(
+        string projectName,
+        int category,
+        CancellationToken cancellationToken = default)
+    {
+        var notes = new List<Models.MentalNote>();
+
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, project_name, category, title, content, tags, priority, created_at, updated_at
+            FROM mental_notes
+            WHERE project_name = @projectName AND category = @category
+            ORDER BY priority DESC, created_at DESC
+            """;
+        cmd.Parameters.AddWithValue("@projectName", projectName);
+        cmd.Parameters.AddWithValue("@category", category);
+
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            notes.Add(ReadMentalNote(reader));
+        }
+
+        return notes;
+    }
+
+    public async Task<List<Models.MentalNote>> GetMentalNotesByTagsAsync(
+        string projectName,
+        List<string> tags,
+        CancellationToken cancellationToken = default)
+    {
+        var notes = new List<Models.MentalNote>();
+
+        await using var cmd = _connection.CreateCommand();
+        var tagConditions = tags.Select((_, i) => $"tags LIKE @tag{i}").ToList();
+        cmd.CommandText = $"""
+            SELECT id, project_name, category, title, content, tags, priority, created_at, updated_at
+            FROM mental_notes
+            WHERE project_name = @projectName AND ({string.Join(" OR ", tagConditions)})
+            ORDER BY priority DESC, created_at DESC
+            """;
+        cmd.Parameters.AddWithValue("@projectName", projectName);
+        for (var i = 0; i < tags.Count; i++)
+        {
+            cmd.Parameters.AddWithValue($"@tag{i}", $"%{tags[i]}%");
+        }
+
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            notes.Add(ReadMentalNote(reader));
+        }
+
+        return notes;
+    }
+
+    public async Task<List<Models.MentalNote>> SearchMentalNotesAsync(
+        string projectName,
+        string query,
+        CancellationToken cancellationToken = default)
+    {
+        var notes = new List<Models.MentalNote>();
+
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, project_name, category, title, content, tags, priority, created_at, updated_at
+            FROM mental_notes
+            WHERE project_name = @projectName
+              AND (title LIKE @query OR content LIKE @query)
+            ORDER BY priority DESC, created_at DESC
+            """;
+        cmd.Parameters.AddWithValue("@projectName", projectName);
+        cmd.Parameters.AddWithValue("@query", $"%{query}%");
+
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            notes.Add(ReadMentalNote(reader));
+        }
+
+        return notes;
+    }
+
+    public async Task<bool> UpdateMentalNoteAsync(
+        long id,
+        int? category,
+        string? title,
+        string? content,
+        string? tags,
+        int? priority,
+        CancellationToken cancellationToken = default)
+    {
+        var updates = new List<string>();
+        var parameters = new List<SqliteParameter>();
+
+        if (category.HasValue)
+        {
+            updates.Add("category = @category");
+            parameters.Add(new SqliteParameter("@category", category.Value));
+        }
+        if (title is not null)
+        {
+            updates.Add("title = @title");
+            parameters.Add(new SqliteParameter("@title", title));
+        }
+        if (content is not null)
+        {
+            updates.Add("content = @content");
+            parameters.Add(new SqliteParameter("@content", content));
+        }
+        if (tags is not null)
+        {
+            updates.Add("tags = @tags");
+            parameters.Add(new SqliteParameter("@tags", tags.Length > 0 ? tags : DBNull.Value));
+        }
+        if (priority.HasValue)
+        {
+            updates.Add("priority = @priority");
+            parameters.Add(new SqliteParameter("@priority", priority.Value));
+        }
+
+        if (updates.Count == 0)
+            return false;
+
+        updates.Add("updated_at = @updatedAt");
+        parameters.Add(new SqliteParameter("@updatedAt", DateTime.UtcNow.ToString("O")));
+        parameters.Add(new SqliteParameter("@id", id));
+
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = $"UPDATE mental_notes SET {string.Join(", ", updates)} WHERE id = @id";
+        foreach (var param in parameters)
+        {
+            cmd.Parameters.Add(param);
+        }
+
+        var affected = await cmd.ExecuteNonQueryAsync(cancellationToken);
+        return affected > 0;
+    }
+
+    public async Task<bool> DeleteMentalNoteAsync(
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM mental_notes WHERE id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+
+        var affected = await cmd.ExecuteNonQueryAsync(cancellationToken);
+        return affected > 0;
+    }
+
+    private static Models.MentalNote ReadMentalNote(SqliteDataReader reader)
+    {
+        return new Models.MentalNote
+        {
+            Id = reader.GetInt64(0),
+            ProjectName = reader.GetString(1),
+            Category = reader.GetInt32(2),
+            Title = reader.GetString(3),
+            Content = reader.GetString(4),
+            Tags = reader.IsDBNull(5) ? null : reader.GetString(5),
+            Priority = reader.GetInt32(6),
+            CreatedAt = DateTime.Parse(reader.GetString(7)),
+            UpdatedAt = DateTime.Parse(reader.GetString(8))
+        };
     }
 
     #endregion
