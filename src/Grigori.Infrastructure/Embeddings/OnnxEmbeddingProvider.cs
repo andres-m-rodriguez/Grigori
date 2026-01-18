@@ -10,18 +10,32 @@ namespace Grigori.Infrastructure.Embeddings;
 
 public class OnnxEmbeddingProvider : IEmbeddingProvider, IDisposable
 {
+    public const string DependencyId = "onnx-model";
+
     private const string ModelUrl = "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx";
     private const string VocabUrl = "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/vocab.txt";
     private const int MaxSequenceLength = 512;
     private const int EmbeddingDimension = 384;
 
-    private readonly InferenceSession _session;
-    private readonly WordPieceTokenizer _tokenizer;
     private readonly ILogger<OnnxEmbeddingProvider> _logger;
+    private readonly IDependencyTracker _tracker;
+    private readonly string _modelPath;
+    private readonly string _vocabPath;
 
-    public OnnxEmbeddingProvider(IOptions<GrigoriOptions> options, ILogger<OnnxEmbeddingProvider> logger)
+    private InferenceSession? _session;
+    private WordPieceTokenizer? _tokenizer;
+    private readonly SemaphoreSlim _initLock = new(1, 1);
+    private bool _initialized;
+    private Exception? _initException;
+
+    public OnnxEmbeddingProvider(
+        IOptions<GrigoriOptions> options,
+        ILogger<OnnxEmbeddingProvider> logger,
+        IDependencyTracker tracker)
     {
         _logger = logger;
+        _tracker = tracker;
+
         var modelPath = options.Value.Onnx.ModelPath;
         var vocabPath = options.Value.Onnx.VocabPath;
 
@@ -37,24 +51,93 @@ public class OnnxEmbeddingProvider : IEmbeddingProvider, IDisposable
                 vocabPath = Path.Combine(defaultDir, "vocab.txt");
         }
 
-        EnsureModelDownloaded(modelPath, vocabPath).GetAwaiter().GetResult();
+        _modelPath = modelPath;
+        _vocabPath = vocabPath;
 
-        _logger.LogInformation("Loading ONNX model from {ModelPath}", modelPath);
-        _session = new InferenceSession(modelPath);
-        _tokenizer = new WordPieceTokenizer(vocabPath);
-        _logger.LogInformation("ONNX embedding provider initialized successfully");
+        // Register with tracker
+        _tracker.Register(DependencyId, "ONNX Model", "all-MiniLM-L6-v2 embedding model (~23 MB)");
+
+        // Start initialization in background
+        _ = InitializeAsync();
     }
 
-    public Task<Result<float[], GrigoriError>> GetEmbeddingAsync(
+    public bool IsReady => _initialized && _session != null;
+
+    private async Task InitializeAsync()
+    {
+        await _initLock.WaitAsync();
+        try
+        {
+            if (_initialized) return;
+
+            _tracker.UpdateStatus(DependencyId, DependencyState.Checking, message: "Checking model files...");
+
+            await EnsureModelDownloadedAsync();
+
+            _tracker.UpdateStatus(DependencyId, DependencyState.Loading, message: "Loading ONNX model...");
+            _logger.LogInformation("Loading ONNX model from {ModelPath}", _modelPath);
+
+            _session = new InferenceSession(_modelPath);
+            _tokenizer = new WordPieceTokenizer(_vocabPath);
+
+            _initialized = true;
+            _tracker.UpdateStatus(DependencyId, DependencyState.Ready, progress: 100, message: "Ready");
+            _logger.LogInformation("ONNX embedding provider initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            _initException = ex;
+            _tracker.UpdateStatus(DependencyId, DependencyState.Failed, message: ex.Message);
+            _logger.LogError(ex, "Failed to initialize ONNX embedding provider");
+        }
+        finally
+        {
+            _initLock.Release();
+        }
+    }
+
+    private async Task EnsureInitializedAsync()
+    {
+        if (_initialized) return;
+
+        await _initLock.WaitAsync();
+        try
+        {
+            if (!_initialized && _initException == null)
+            {
+                // Initialization is still in progress, wait for it
+                _initLock.Release();
+                while (!_initialized && _initException == null)
+                {
+                    await Task.Delay(100);
+                }
+                return;
+            }
+
+            if (_initException != null)
+            {
+                throw new InvalidOperationException("ONNX model failed to initialize", _initException);
+            }
+        }
+        finally
+        {
+            if (_initLock.CurrentCount == 0)
+                _initLock.Release();
+        }
+    }
+
+    public async Task<Result<float[], GrigoriError>> GetEmbeddingAsync(
         string text,
         EmbeddingInputType inputType,
         CancellationToken cancellationToken = default)
     {
         try
         {
+            await EnsureInitializedAsync();
             cancellationToken.ThrowIfCancellationRequested();
+
             var embedding = GenerateEmbedding(text);
-            return Task.FromResult<Result<float[], GrigoriError>>(embedding);
+            return embedding;
         }
         catch (OperationCanceledException)
         {
@@ -63,21 +146,21 @@ public class OnnxEmbeddingProvider : IEmbeddingProvider, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to generate embedding");
-            return Task.FromResult<Result<float[], GrigoriError>>(
-                GrigoriError.EmbeddingProviderError($"Failed to generate embedding: {ex.Message}", ex));
+            return GrigoriError.EmbeddingProviderError($"Failed to generate embedding: {ex.Message}", ex);
         }
     }
 
-    public Task<Result<float[][], GrigoriError>> GetEmbeddingsAsync(
+    public async Task<Result<float[][], GrigoriError>> GetEmbeddingsAsync(
         IReadOnlyList<string> texts,
         EmbeddingInputType inputType,
         CancellationToken cancellationToken = default)
     {
         if (texts.Count == 0)
-            return Task.FromResult<Result<float[][], GrigoriError>>(Array.Empty<float[]>());
+            return Array.Empty<float[]>();
 
         try
         {
+            await EnsureInitializedAsync();
             _logger.LogDebug("Generating embeddings for {Count} texts using ONNX", texts.Count);
 
             var results = new float[texts.Count][];
@@ -87,7 +170,7 @@ public class OnnxEmbeddingProvider : IEmbeddingProvider, IDisposable
                 results[i] = GenerateEmbedding(texts[i]);
             }
 
-            return Task.FromResult<Result<float[][], GrigoriError>>(results);
+            return results;
         }
         catch (OperationCanceledException)
         {
@@ -96,13 +179,15 @@ public class OnnxEmbeddingProvider : IEmbeddingProvider, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to generate embeddings batch");
-            return Task.FromResult<Result<float[][], GrigoriError>>(
-                GrigoriError.EmbeddingProviderError($"Failed to generate embeddings: {ex.Message}", ex));
+            return GrigoriError.EmbeddingProviderError($"Failed to generate embeddings: {ex.Message}", ex);
         }
     }
 
     private float[] GenerateEmbedding(string text)
     {
+        if (_session == null || _tokenizer == null)
+            throw new InvalidOperationException("ONNX model not initialized");
+
         var (inputIds, attentionMask, tokenTypeIds) = _tokenizer.Encode(text, MaxSequenceLength);
 
         var inputIdsTensor = new DenseTensor<long>(inputIds, [1, inputIds.Length]);
@@ -165,35 +250,79 @@ public class OnnxEmbeddingProvider : IEmbeddingProvider, IDisposable
         return embedding;
     }
 
-    private async Task EnsureModelDownloaded(string modelPath, string vocabPath)
+    private async Task EnsureModelDownloadedAsync()
     {
-        var modelDir = Path.GetDirectoryName(modelPath);
+        var modelDir = Path.GetDirectoryName(_modelPath);
         if (!string.IsNullOrEmpty(modelDir))
             Directory.CreateDirectory(modelDir);
+
+        var needsModelDownload = !File.Exists(_modelPath);
+        var needsVocabDownload = !File.Exists(_vocabPath);
+
+        if (!needsModelDownload && !needsVocabDownload)
+        {
+            _tracker.UpdateStatus(DependencyId, DependencyState.Checking, progress: 100, message: "Model files found");
+            return;
+        }
 
         using var httpClient = new HttpClient();
         httpClient.Timeout = TimeSpan.FromMinutes(10);
 
-        if (!File.Exists(modelPath))
+        if (needsModelDownload)
         {
-            _logger.LogInformation("Downloading ONNX model to {ModelPath}...", modelPath);
-            var bytes = await httpClient.GetByteArrayAsync(ModelUrl);
-            await File.WriteAllBytesAsync(modelPath, bytes);
-            _logger.LogInformation("ONNX model downloaded successfully ({Size:F1} MB)", bytes.Length / 1024.0 / 1024.0);
+            _tracker.UpdateStatus(DependencyId, DependencyState.Downloading, progress: 0, message: "Downloading ONNX model...");
+            _logger.LogInformation("Downloading ONNX model to {ModelPath}...", _modelPath);
+
+            await DownloadWithProgressAsync(httpClient, ModelUrl, _modelPath, "model");
         }
 
-        if (!File.Exists(vocabPath))
+        if (needsVocabDownload)
         {
-            _logger.LogInformation("Downloading vocabulary to {VocabPath}...", vocabPath);
+            _tracker.UpdateStatus(DependencyId, DependencyState.Downloading, progress: 95, message: "Downloading vocabulary...");
+            _logger.LogInformation("Downloading vocabulary to {VocabPath}...", _vocabPath);
+
             var content = await httpClient.GetStringAsync(VocabUrl);
-            await File.WriteAllTextAsync(vocabPath, content);
+            await File.WriteAllTextAsync(_vocabPath, content);
             _logger.LogInformation("Vocabulary downloaded successfully");
         }
     }
 
+    private async Task DownloadWithProgressAsync(HttpClient client, string url, string destPath, string name)
+    {
+        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        var totalBytes = response.Content.Headers.ContentLength ?? -1;
+        var downloadedBytes = 0L;
+
+        await using var contentStream = await response.Content.ReadAsStreamAsync();
+        await using var fileStream = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
+
+        var buffer = new byte[8192];
+        int bytesRead;
+
+        while ((bytesRead = await contentStream.ReadAsync(buffer)) > 0)
+        {
+            await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead));
+            downloadedBytes += bytesRead;
+
+            if (totalBytes > 0)
+            {
+                var progress = (double)downloadedBytes / totalBytes * 90; // Reserve 10% for vocab + loading
+                var sizeMb = downloadedBytes / 1024.0 / 1024.0;
+                var totalMb = totalBytes / 1024.0 / 1024.0;
+                _tracker.UpdateStatus(DependencyId, DependencyState.Downloading, progress,
+                    $"Downloading {name}: {sizeMb:F1} / {totalMb:F1} MB");
+            }
+        }
+
+        _logger.LogInformation("Downloaded {Name} successfully ({Size:F1} MB)", name, downloadedBytes / 1024.0 / 1024.0);
+    }
+
     public void Dispose()
     {
-        _session.Dispose();
+        _session?.Dispose();
+        _initLock.Dispose();
         GC.SuppressFinalize(this);
     }
 }

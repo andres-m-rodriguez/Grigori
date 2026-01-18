@@ -1,6 +1,7 @@
 using Grigori.Contracts.Interfaces;
 using Grigori.Contracts.Options;
 using Grigori.Infrastructure.Chunking;
+using Grigori.Infrastructure.Dependencies;
 using Grigori.Infrastructure.Embeddings;
 using Grigori.Infrastructure.FileWatching;
 using Grigori.Infrastructure.Indexing;
@@ -15,6 +16,9 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddGrigoriInfrastructure(this IServiceCollection services)
     {
+        // Dependency tracking (singleton, must be registered first)
+        services.AddSingleton<IDependencyTracker, DependencyTracker>();
+
         // Metrics (singleton for thread-safe metrics tracking)
         services.AddSingleton<IMetricsService, MetricsService>();
 
