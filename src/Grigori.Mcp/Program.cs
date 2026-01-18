@@ -113,6 +113,10 @@ if (mcpMode || mcpHttpMode)
 
 var app = builder.Build();
 
+// Eagerly initialize embedding provider to start background model loading
+// This triggers registration with the dependency tracker
+_ = app.Services.GetRequiredService<IEmbeddingProvider>();
+
 app.UseCors();
 
 // ============================================================================
