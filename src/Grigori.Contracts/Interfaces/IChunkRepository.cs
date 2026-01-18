@@ -37,6 +37,14 @@ public interface IChunkRepository
 
     Task<IEnumerable<(long Id, float[] Embedding)>> GetAllEmbeddingsAsync(
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets all chunks for lexical (BM25) search.
+    /// Returns chunk metadata and content without embeddings for efficiency.
+    /// </summary>
+    Task<Result<List<ChunkForLexicalSearch>, GrigoriError>> GetChunksForLexicalSearchAsync(
+        List<string>? fileExtensions = null,
+        CancellationToken cancellationToken = default);
 }
 
 public record CodeChunkInput
@@ -57,5 +65,18 @@ public record SearchResultItem
     public required int EndLine { get; init; }
     public required string Content { get; init; }
     public required float Score { get; init; }
+    public List<string> Features { get; init; } = [];
+}
+
+/// <summary>
+/// Lightweight chunk data for lexical search (no embedding).
+/// </summary>
+public record ChunkForLexicalSearch
+{
+    public required long Id { get; init; }
+    public required string FilePath { get; init; }
+    public required int StartLine { get; init; }
+    public required int EndLine { get; init; }
+    public required string Content { get; init; }
     public List<string> Features { get; init; } = [];
 }

@@ -188,6 +188,33 @@ public class ChunkRepository : IChunkRepository
         return chunks.Select(chunk => (chunk.Id, DeserializeEmbedding(chunk.Embedding)));
     }
 
+    public async Task<Result<List<ChunkForLexicalSearch>, GrigoriError>> GetChunksForLexicalSearchAsync(
+        List<string>? fileExtensions = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var chunks = await _dbContext.GetChunksForLexicalSearchAsync(fileExtensions, cancellationToken);
+
+            var results = chunks.Select(chunk => new ChunkForLexicalSearch
+            {
+                Id = chunk.Id,
+                FilePath = chunk.FilePath,
+                StartLine = chunk.StartLine,
+                EndLine = chunk.EndLine,
+                Content = chunk.Content,
+                Features = chunk.Features?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() ?? []
+            }).ToList();
+
+            return results;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get chunks for lexical search");
+            return GrigoriError.DatabaseError($"Failed to get chunks: {ex.Message}", ex);
+        }
+    }
+
     private byte[] SerializeEmbedding(float[] embedding)
     {
         if (_options.Quantization == QuantizationMode.Int8)
