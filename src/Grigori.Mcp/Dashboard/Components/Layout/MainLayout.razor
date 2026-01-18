@@ -37,61 +37,20 @@
             <MudNavLink Href="search" Icon="@Icons.Material.Filled.Search" IconColor="Color.Tertiary">
                 Search
             </MudNavLink>
-            <MudNavGroup Title="Tools" Icon="@Icons.Material.Filled.Build" IconColor="Color.Warning" Expanded="false">
+            <MudNavLink Href="projects" Icon="@Icons.Material.Filled.Folder" IconColor="Color.Warning">
+                Projects
+            </MudNavLink>
+            <MudNavLink Href="dependencies" Icon="@Icons.Material.Filled.Extension" IconColor="Color.Success">
+                Dependencies
+            </MudNavLink>
+            <MudNavGroup Title="Tools" Icon="@Icons.Material.Filled.Build" IconColor="Color.Error" Expanded="false">
                 <MudNavLink Href="tools/cli" Icon="@Icons.Material.Filled.Terminal">
                     CLI
                 </MudNavLink>
             </MudNavGroup>
         </MudNavMenu>
 
-        <MudDivider Class="my-2" DividerType="DividerType.Middle" />
-
-        @if (_drawerOpen || !_isMobile)
-        {
-            <MudText Typo="Typo.overline" Class="px-4 mt-2" Style="color: var(--mud-palette-primary); font-weight: 600; letter-spacing: 1px;">
-                Projects
-            </MudText>
-
-            @if (_loading)
-            {
-                <div class="d-flex justify-center my-2">
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
-                </div>
-            }
-            else if (_projects.Count == 0)
-            {
-                <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true" Class="mx-2 my-1" NoIcon="true">
-                    <MudText Typo="Typo.caption">No projects indexed</MudText>
-                </MudAlert>
-            }
-            else
-            {
-                <MudNavMenu Dense="true" Color="Color.Primary">
-                    @foreach (var project in _projects)
-                    {
-                        <MudNavLink Icon="@Icons.Material.Filled.Folder" IconColor="Color.Warning">
-                            <div class="d-flex flex-column">
-                                <MudText Typo="Typo.body2" Style="font-weight: 500;">@project.Name</MudText>
-                                <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
-                                    @project.FileCount files
-                                </MudText>
-                            </div>
-                        </MudNavLink>
-                    }
-                </MudNavMenu>
-            }
-        }
-
         <MudSpacer />
-
-        <MudDivider Class="my-2" DividerType="DividerType.Middle" />
-
-        @if (_drawerOpen || !_isMobile)
-        {
-            <div class="px-2 mb-2">
-                <DependencyStatusPanel />
-            </div>
-        }
 
         <div class="pa-3" style="background: var(--mud-palette-surface);">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
@@ -114,8 +73,6 @@
 @code {
     private bool _drawerOpen = true;
     private bool _isMobile = false;
-    private List<IndexedProject> _projects = [];
-    private bool _loading = true;
     private int _totalChunks = 0;
 
     private DrawerVariant _drawerVariant => _isMobile ? DrawerVariant.Temporary : DrawerVariant.Mini;
@@ -188,16 +145,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try
-        {
-            _projects = await DashboardService.GetIndexedProjectsAsync();
-            var stats = await DashboardService.GetIndexStatsAsync();
-            _totalChunks = stats?.TotalChunks ?? 0;
-        }
-        finally
-        {
-            _loading = false;
-        }
+        var stats = await DashboardService.GetIndexStatsAsync();
+        _totalChunks = stats?.TotalChunks ?? 0;
     }
 
     public async ValueTask DisposeAsync()
