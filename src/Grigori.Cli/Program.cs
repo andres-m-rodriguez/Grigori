@@ -12,6 +12,7 @@ const string Dim = "\x1b[90m";
 var server = "http://localhost:5151";
 var path = ".";
 var showHelp = false;
+var batchSize = 100;
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -21,6 +22,11 @@ for (int i = 0; i < args.Length; i++)
         case "--server":
             if (i + 1 < args.Length)
                 server = args[++i];
+            break;
+        case "-b":
+        case "--batch-size":
+            if (i + 1 < args.Length && int.TryParse(args[++i], out var size))
+                batchSize = size;
             break;
         case "-h":
         case "--help":
@@ -55,12 +61,14 @@ if (showHelp || args.Length == 0)
 
         {Yellow}Options:{Reset}
           -s, --server <url>    Grigori server URL (default: http://localhost:5151)
+          -b, --batch-size <n>  Files per batch (default: 100)
           -h, --help            Show help information
 
         {Yellow}Examples:{Reset}
           grigori index                     Index current directory
           grigori index ./my-project        Index specific directory
           grigori index . -s http://grigori:5151   Use custom server
+          grigori index . -b 50             Use smaller batch size
         """);
     return 0;
 }
@@ -105,17 +113,39 @@ if (files.Count == 0)
     return 0;
 }
 
-// Send to server
-Console.Write($"{Dim}Indexing...{Reset}");
-var result = await client.IndexFilesAsync(projectName, files);
+// Calculate number of batches
+var totalBatches = (int)Math.Ceiling(files.Count / (double)batchSize);
+Console.WriteLine($"{Dim}Uploading in {totalBatches} batch(es) of up to {batchSize} files each{Reset}");
+Console.WriteLine();
+
+// Send to server in batches
+var lastBatch = 0;
+var result = await client.IndexFilesInBatchesAsync(projectName, files, batchSize, progress =>
+{
+    if (progress.Status == BatchStatus.Uploading)
+    {
+        Console.Write($"\r{Dim}Batch {progress.CurrentBatch}/{progress.TotalBatches}:{Reset} Uploading {progress.FilesInBatch} files...          ");
+    }
+    else if (progress.Status == BatchStatus.Completed)
+    {
+        Console.WriteLine($"\r{Green}Batch {progress.CurrentBatch}/{progress.TotalBatches}:{Reset} {progress.FilesIndexed} files, {progress.ChunksCreated} chunks          ");
+        lastBatch = progress.CurrentBatch;
+    }
+    else if (progress.Status == BatchStatus.Failed)
+    {
+        Console.WriteLine($"\r{Red}Batch {progress.CurrentBatch}/{progress.TotalBatches}:{Reset} Failed - {progress.Error}          ");
+    }
+});
+
+Console.WriteLine();
 
 if (result.Success)
 {
-    Console.WriteLine($"\r{Green}Success!{Reset} Indexed {result.FilesIndexed} files with {result.ChunksCreated} chunks in {result.DurationMs}ms");
+    Console.WriteLine($"{Green}Success!{Reset} Indexed {result.FilesIndexed} files with {result.ChunksCreated} chunks in {result.DurationMs}ms");
     return 0;
 }
 else
 {
-    Console.WriteLine($"\r{Red}Error:{Reset} {result.Error}");
+    Console.WriteLine($"{Red}Error:{Reset} {result.Error}");
     return 1;
 }
