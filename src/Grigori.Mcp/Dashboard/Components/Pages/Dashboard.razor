@@ -265,7 +265,8 @@ else
         if (_performanceData.Count == 0)
             return;
 
-        _chartLabels = _performanceData.Select(p => p.FormattedHour).ToArray();
+        // Show labels every 4 hours to avoid clutter
+        _chartLabels = _performanceData.Select((p, i) => i % 4 == 0 ? p.FormattedHour : "").ToArray();
 
         _chartSeries =
         [

@@ -255,13 +255,45 @@ public class DashboardService
 
     public async Task<List<PerformanceDataPointDto>> GetPerformanceMetricsAsync(int hoursBack = 24)
     {
-        var metrics = await _dbContext.GetHourlyPerformanceMetricsAsync(hoursBack);
-        return metrics.Select(m => new PerformanceDataPointDto
+        var dbMetrics = await _dbContext.GetHourlyPerformanceMetricsAsync(hoursBack);
+
+        // Create a lookup for the actual data
+        var metricsLookup = dbMetrics.ToDictionary(
+            m => m.Hour.ToString("yyyy-MM-dd HH:00"),
+            m => (m.AvgSearchTimeMs, m.AvgIndexTimeMs));
+
+        // Generate all hours in the range
+        var result = new List<PerformanceDataPointDto>();
+        var now = DateTime.UtcNow;
+        var startHour = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, DateTimeKind.Utc)
+            .AddHours(-hoursBack + 1);
+
+        for (int i = 0; i < hoursBack; i++)
         {
-            Timestamp = m.Hour,
-            AvgSearchTimeMs = m.AvgSearchTimeMs,
-            AvgIndexTimeMs = m.AvgIndexTimeMs
-        }).ToList();
+            var hour = startHour.AddHours(i);
+            var key = hour.ToString("yyyy-MM-dd HH:00");
+
+            if (metricsLookup.TryGetValue(key, out var data))
+            {
+                result.Add(new PerformanceDataPointDto
+                {
+                    Timestamp = hour,
+                    AvgSearchTimeMs = data.AvgSearchTimeMs,
+                    AvgIndexTimeMs = data.AvgIndexTimeMs
+                });
+            }
+            else
+            {
+                result.Add(new PerformanceDataPointDto
+                {
+                    Timestamp = hour,
+                    AvgSearchTimeMs = 0,
+                    AvgIndexTimeMs = 0
+                });
+            }
+        }
+
+        return result;
     }
 }
 
