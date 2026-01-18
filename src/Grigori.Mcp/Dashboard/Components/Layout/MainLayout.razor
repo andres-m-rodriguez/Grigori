@@ -1,90 +1,111 @@
 @inherits LayoutComponentBase
 @inject DashboardService DashboardService
+@inject IBrowserViewportService BrowserViewportService
+@implements IAsyncDisposable
+@implements IBrowserViewportObserver
 
-<MudThemeProvider IsDarkMode="true" />
+<MudThemeProvider Theme="_theme" IsDarkMode="true" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1" Dense="true">
+    <MudAppBar Elevation="0" Dense="true" Style="background: linear-gradient(90deg, var(--mud-palette-primary-darken) 0%, var(--mud-palette-dark) 100%); border-bottom: 1px solid var(--mud-palette-lines-default);">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="ToggleDrawer" />
-        <MudIcon Icon="@Icons.Material.Filled.Hub" Class="mr-2" />
-        <MudText Typo="Typo.h6">Grigori</MudText>
+        <MudIcon Icon="@Icons.Material.Filled.Hub" Class="mr-2" Style="color: var(--mud-palette-primary);" />
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">Grigori</MudText>
         <MudSpacer />
-        <MudChip T="string" Icon="@Icons.Material.Filled.Storage" Size="Size.Small" Variant="Variant.Text">
+        <MudChip T="string" Icon="@Icons.Material.Filled.Storage" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">
             @_totalChunks.ToString("N0") chunks
         </MudChip>
     </MudAppBar>
 
-    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" Variant="DrawerVariant.Mini" OpenMiniOnHover="true">
-        <MudNavMenu>
-            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">
+    <MudDrawer @bind-Open="_drawerOpen"
+               Elevation="2"
+               Variant="@_drawerVariant"
+               OpenMiniOnHover="@(!_isMobile)"
+               ClipMode="DrawerClipMode.Always"
+               Breakpoint="Breakpoint.Md">
+
+        <MudNavMenu Color="Color.Primary">
+            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" IconColor="Color.Info">
                 Home
             </MudNavLink>
-            <MudNavLink Href="dashboard" Icon="@Icons.Material.Filled.Dashboard">
+            <MudNavLink Href="dashboard" Icon="@Icons.Material.Filled.Dashboard" IconColor="Color.Secondary">
                 Dashboard
             </MudNavLink>
-            <MudNavLink Href="search" Icon="@Icons.Material.Filled.Search">
+            <MudNavLink Href="search" Icon="@Icons.Material.Filled.Search" IconColor="Color.Tertiary">
                 Search
             </MudNavLink>
-            <MudNavGroup Title="Tools" Icon="@Icons.Material.Filled.Build" Expanded="false">
+            <MudNavGroup Title="Tools" Icon="@Icons.Material.Filled.Build" IconColor="Color.Warning" Expanded="false">
                 <MudNavLink Href="tools/cli" Icon="@Icons.Material.Filled.Terminal">
                     CLI
                 </MudNavLink>
             </MudNavGroup>
         </MudNavMenu>
 
-        <MudDivider Class="my-2" />
+        <MudDivider Class="my-2" DividerType="DividerType.Middle" />
 
-        <MudText Typo="Typo.overline" Class="px-4 mt-2" Style="color: var(--mud-palette-text-secondary);">
-            Projects
-        </MudText>
-
-        @if (_loading)
+        @if (_drawerOpen || !_isMobile)
         {
-            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mx-4 my-2" />
-        }
-        else if (_projects.Count == 0)
-        {
-            <MudText Typo="Typo.caption" Class="px-4" Style="color: var(--mud-palette-text-disabled);">
-                No projects indexed
+            <MudText Typo="Typo.overline" Class="px-4 mt-2" Style="color: var(--mud-palette-primary); font-weight: 600; letter-spacing: 1px;">
+                Projects
             </MudText>
-        }
-        else
-        {
-            <MudNavMenu Dense="true">
-                @foreach (var project in _projects)
-                {
-                    <MudNavLink Icon="@Icons.Material.Filled.Folder">
-                        <div class="d-flex flex-column">
-                            <MudText Typo="Typo.body2">@project.Name</MudText>
-                            <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
-                                @project.FileCount files
-                            </MudText>
-                        </div>
-                    </MudNavLink>
-                }
-            </MudNavMenu>
+
+            @if (_loading)
+            {
+                <div class="d-flex justify-center my-2">
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+                </div>
+            }
+            else if (_projects.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Text" Dense="true" Class="mx-2 my-1" NoIcon="true">
+                    <MudText Typo="Typo.caption">No projects indexed</MudText>
+                </MudAlert>
+            }
+            else
+            {
+                <MudNavMenu Dense="true" Color="Color.Primary">
+                    @foreach (var project in _projects)
+                    {
+                        <MudNavLink Icon="@Icons.Material.Filled.Folder" IconColor="Color.Warning">
+                            <div class="d-flex flex-column">
+                                <MudText Typo="Typo.body2" Style="font-weight: 500;">@project.Name</MudText>
+                                <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
+                                    @project.FileCount files
+                                </MudText>
+                            </div>
+                        </MudNavLink>
+                    }
+                </MudNavMenu>
+            }
         }
 
         <MudSpacer />
 
-        <MudDivider Class="my-2" />
+        <MudDivider Class="my-2" DividerType="DividerType.Middle" />
 
-        <div class="px-2">
-            <DependencyStatusPanel />
-        </div>
+        @if (_drawerOpen || !_isMobile)
+        {
+            <div class="px-2 mb-2">
+                <DependencyStatusPanel />
+            </div>
+        }
 
-        <div class="pa-4">
-            <MudChip T="string" Icon="@Icons.Material.Filled.Circle" Size="Size.Small" Color="Color.Success" Variant="Variant.Text">
-                Server Online
-            </MudChip>
+        <div class="pa-3" style="background: var(--mud-palette-surface);">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudIcon Icon="@Icons.Material.Filled.Circle" Size="Size.Small" Color="Color.Success" />
+                @if (_drawerOpen || !_isMobile)
+                {
+                    <MudText Typo="Typo.caption" Style="color: var(--mud-palette-success);">Online</MudText>
+                }
+            </MudStack>
         </div>
     </MudDrawer>
 
-    <MudMainContent Class="pt-16 px-4">
-        <MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudMainContent Class="pt-14">
+        <MudContainer MaxWidth="MaxWidth.Large" Class="py-4 px-4">
             @Body
         </MudContainer>
     </MudMainContent>
@@ -92,11 +113,78 @@
 
 @code {
     private bool _drawerOpen = true;
+    private bool _isMobile = false;
     private List<IndexedProject> _projects = [];
     private bool _loading = true;
     private int _totalChunks = 0;
 
+    private DrawerVariant _drawerVariant => _isMobile ? DrawerVariant.Temporary : DrawerVariant.Mini;
+
+    // IBrowserViewportObserver implementation
+    public Guid Id { get; } = Guid.NewGuid();
+
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#7c4dff",
+            Secondary = "#00bfa5",
+            Tertiary = "#ff6d00",
+            Info = "#2196f3",
+            Success = "#00c853",
+            Warning = "#ffc107",
+            Error = "#ff5252",
+        },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#b388ff",
+            Secondary = "#64ffda",
+            Tertiary = "#ffab40",
+            Info = "#64b5f6",
+            Success = "#69f0ae",
+            Warning = "#ffd54f",
+            Error = "#ff8a80",
+            Surface = "#1e1e2e",
+            Background = "#121218",
+            BackgroundGray = "#1a1a24",
+            Dark = "#0d0d12",
+            DarkLighten = "#2a2a3a",
+            DrawerBackground = "#161622",
+            AppbarBackground = "#0d0d12",
+            TextPrimary = "#e4e4e7",
+            TextSecondary = "#a1a1aa",
+        },
+        Typography = new Typography()
+        {
+            Default = new DefaultTypography()
+            {
+                FontFamily = new[] { "Inter", "Segoe UI", "Roboto", "sans-serif" }
+            }
+        }
+    };
+
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await BrowserViewportService.SubscribeAsync(this, fireImmediately: true);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    // IBrowserViewportObserver callback
+    public async Task NotifyBrowserViewportChangeAsync(BrowserViewportEventArgs args)
+    {
+        _isMobile = args.Breakpoint < Breakpoint.Md;
+        if (_isMobile && _drawerOpen)
+        {
+            _drawerOpen = false;
+        }
+        await InvokeAsync(StateHasChanged);
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -110,5 +198,10 @@
         {
             _loading = false;
         }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await BrowserViewportService.UnsubscribeAsync(this);
     }
 }
