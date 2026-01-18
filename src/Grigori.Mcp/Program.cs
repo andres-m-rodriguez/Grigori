@@ -20,15 +20,16 @@ using ModelContextProtocol.Server;
 var builder = WebApplication.CreateBuilder(args);
 
 // Check run mode
-var mcpMode = args.Contains("--mcp");           // stdio MCP mode (for local use)
-var serverMode = args.Contains("--server");      // HTTP server mode (for Docker/shared)
-var dashboardOnly = args.Contains("--dashboard"); // Dashboard only
+var mcpMode = args.Contains("--mcp");             // stdio MCP mode (for local use)
+var mcpHttpMode = args.Contains("--mcp-http");    // HTTP MCP mode (for remote AI clients)
+var serverMode = args.Contains("--server");        // HTTP server mode (for Docker/shared)
+var dashboardOnly = args.Contains("--dashboard");  // Dashboard only
 
 var dashboardPort = builder.Configuration.GetValue("Grigori:Dashboard:Port", 5151);
 var apiPort = builder.Configuration.GetValue("Grigori:Api:Port", 5152);
 
 // Default to server mode if no flags provided
-if (!mcpMode && !dashboardOnly)
+if (!mcpMode && !mcpHttpMode && !dashboardOnly)
     serverMode = true;
 
 // Add configuration
@@ -66,19 +67,30 @@ builder.Services.AddCors(options =>
     });
 });
 
-if (mcpMode)
+if (mcpMode || mcpHttpMode)
 {
-    // Register MCP tool endpoints for stdio mode
+    // Register MCP tool endpoints
     builder.Services.AddScoped<SearchEndpoints>();
     builder.Services.AddScoped<IndexEndpoints>();
     builder.Services.AddScoped<MetricsEndpoints>();
     builder.Services.AddScoped<BenchmarkEndpoints>();
 
-    // Register MCP server with stdio transport
-    builder.Services
-        .AddMcpServer()
-        .WithStdioServerTransport()
-        .WithToolsFromAssembly();
+    if (mcpMode)
+    {
+        // Register MCP server with stdio transport (local use)
+        builder.Services
+            .AddMcpServer()
+            .WithStdioServerTransport()
+            .WithToolsFromAssembly();
+    }
+    else if (mcpHttpMode)
+    {
+        // Register MCP server with HTTP transport (remote AI clients)
+        builder.Services
+            .AddMcpServer()
+            .WithHttpTransport()
+            .WithToolsFromAssembly();
+    }
 }
 
 // Configure Kestrel
@@ -90,6 +102,17 @@ builder.WebHost.ConfigureKestrel(options =>
 var app = builder.Build();
 
 app.UseCors();
+
+// ============================================================================
+// MCP HTTP Endpoints (for remote AI clients)
+// ============================================================================
+
+if (mcpHttpMode)
+{
+    // Map MCP endpoints for Streamable HTTP transport
+    // This exposes /mcp endpoint that accepts JSON-RPC over HTTP
+    app.MapMcp();
+}
 
 // ============================================================================
 // REST API Endpoints (for Docker/shared mode)
@@ -197,13 +220,25 @@ app.MapRazorComponents<App>()
 if (mcpMode)
 {
     // MCP stdio mode - runs MCP server + dashboard
-    Console.Error.WriteLine($"Grigori MCP Server started. Dashboard at http://localhost:{dashboardPort}/dashboard");
+    Console.Error.WriteLine($"Grigori MCP Server started (stdio transport)");
+    Console.Error.WriteLine($"  Dashboard: http://localhost:{dashboardPort}/dashboard");
     _ = Task.Run(() => app.RunAsync());
     await Task.Delay(Timeout.Infinite);
 }
+else if (mcpHttpMode)
+{
+    // MCP HTTP mode - runs MCP server over HTTP + REST API + Dashboard
+    Console.WriteLine($"Grigori MCP Server started (HTTP transport)");
+    Console.WriteLine($"  MCP SSE:   http://localhost:{dashboardPort}/sse");
+    Console.WriteLine($"  MCP Msg:   http://localhost:{dashboardPort}/message");
+    Console.WriteLine($"  Dashboard: http://localhost:{dashboardPort}/dashboard");
+    Console.WriteLine($"  API:       http://localhost:{dashboardPort}/api");
+    Console.WriteLine($"  Health:    http://localhost:{dashboardPort}/api/health");
+    await app.RunAsync();
+}
 else
 {
-    // Server mode - HTTP API + Dashboard
+    // Server mode - HTTP API + Dashboard (no MCP)
     Console.WriteLine($"Grigori Server started");
     Console.WriteLine($"  Dashboard: http://localhost:{dashboardPort}/dashboard");
     Console.WriteLine($"  API:       http://localhost:{dashboardPort}/api");
