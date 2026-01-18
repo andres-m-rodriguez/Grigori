@@ -1,4 +1,5 @@
 using Grigori.Contracts.Dtos.Metrics;
+using Grigori.Contracts.Dtos.Search;
 using Grigori.Contracts.Interfaces;
 using Grigori.Database;
 using Grigori.Infrastructure.Indexing;
@@ -12,10 +13,10 @@ public class DashboardService
     private readonly HnswIndex _hnswIndex;
     private readonly IServiceProvider _serviceProvider;
 
-    // Lazy-load embedding provider to avoid blocking page render
-    private IEmbeddingProvider? _embeddingProvider;
-    private IEmbeddingProvider EmbeddingProvider =>
-        _embeddingProvider ??= _serviceProvider.GetRequiredService<IEmbeddingProvider>();
+    // Lazy-load services to avoid blocking page render
+    private ISearchService? _searchService;
+    private ISearchService SearchService =>
+        _searchService ??= _serviceProvider.GetRequiredService<ISearchService>();
 
     public DashboardService(
         GrigoriDbContext dbContext,
@@ -118,110 +119,33 @@ public class DashboardService
         return bestMatch ?? filePath;
     }
 
-    public async Task<List<SearchResult>> SearchAsync(string query, int limit = 10)
+    public async Task<List<SearchResult>> SearchAsync(string query, int limit = 10, string searchMode = "hybrid")
     {
         if (string.IsNullOrWhiteSpace(query))
             return [];
 
-        // Generate embedding for query (lazy-loads embedding provider on first search)
-        var embeddingResult = await EmbeddingProvider.GetEmbeddingAsync(
-            query,
-            EmbeddingInputType.Query);
+        // Use the shared SearchService for consistent search behavior
+        var request = new SearchRequestDto
+        {
+            Query = query,
+            Limit = limit,
+            SearchMode = searchMode,
+            OutputMode = "full"
+        };
 
-        if (embeddingResult.IsFailure)
+        var result = await SearchService.SearchAsync(request);
+
+        if (result.IsFailure)
             return [];
 
-        var queryEmbedding = embeddingResult.Value;
-
-        // Search using HNSW if available
-        if (_hnswIndex.IsBuilt)
+        return result.Value.Results.Select(r => new SearchResult
         {
-            var searchResults = _hnswIndex.Search(queryEmbedding, limit);
-
-            // Fetch chunk details
-            var chunks = await _dbContext.GetAllChunksAsync();
-            var chunkDict = chunks.ToDictionary(c => c.Id);
-
-            return searchResults
-                .Where(r => chunkDict.ContainsKey(r.Id))
-                .Select(r =>
-                {
-                    var chunk = chunkDict[r.Id];
-                    return new SearchResult
-                    {
-                        FilePath = chunk.FilePath,
-                        StartLine = chunk.StartLine,
-                        EndLine = chunk.EndLine,
-                        Content = chunk.Content,
-                        Score = HnswIndex.DistanceToSimilarity(r.Distance)
-                    };
-                })
-                .ToList();
-        }
-
-        // Fallback to linear scan
-        var allChunks = await _dbContext.GetAllChunksAsync();
-        return allChunks
-            .Select(c => new
-            {
-                Chunk = c,
-                Embedding = DeserializeEmbedding(c.Embedding)
-            })
-            .Select(x => new SearchResult
-            {
-                FilePath = x.Chunk.FilePath,
-                StartLine = x.Chunk.StartLine,
-                EndLine = x.Chunk.EndLine,
-                Content = x.Chunk.Content,
-                Score = CosineSimilarity(queryEmbedding, x.Embedding)
-            })
-            .OrderByDescending(r => r.Score)
-            .Take(limit)
-            .ToList();
-    }
-
-    private static float[] DeserializeEmbedding(byte[] bytes)
-    {
-        // Detect format - common dimensions for float32
-        int[] commonDimensions = [384, 768, 1024, 1536];
-        var floatCount = bytes.Length / sizeof(float);
-
-        if (Array.Exists(commonDimensions, d => d == floatCount))
-        {
-            // Float32 format
-            var embedding = new float[floatCount];
-            Buffer.BlockCopy(bytes, 0, embedding, 0, bytes.Length);
-            return embedding;
-        }
-
-        // Int8 quantized format
-        var scale = BitConverter.ToSingle(bytes, 0);
-        var zeroPoint = BitConverter.ToSingle(bytes, 4);
-        var result = new float[bytes.Length - 8];
-
-        for (var i = 0; i < result.Length; i++)
-        {
-            result[i] = (bytes[8 + i] - zeroPoint) * scale;
-        }
-
-        return result;
-    }
-
-    private static float CosineSimilarity(float[] a, float[] b)
-    {
-        if (a.Length != b.Length)
-            return 0f;
-
-        float dot = 0, normA = 0, normB = 0;
-        for (int i = 0; i < a.Length; i++)
-        {
-            dot += a[i] * b[i];
-            normA += a[i] * a[i];
-            normB += b[i] * b[i];
-        }
-
-        var denom = MathF.Sqrt(normA) * MathF.Sqrt(normB);
-        return denom > 0 ? dot / denom : 0f;
+            FilePath = r.FilePath,
+            StartLine = r.StartLine,
+            EndLine = r.EndLine,
+            Content = r.Content,
+            Score = r.Score
+        }).ToList();
     }
 
     public async Task<List<ActivityLogDto>> GetRecentActivityAsync(int limit = 20)

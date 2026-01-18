@@ -2,6 +2,7 @@ using Grigori.Mcp.Dashboard.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
+using MudBlazor;
 
 namespace Grigori.Mcp.Dashboard.Components.Pages;
 
@@ -11,6 +12,7 @@ public partial class Search : ComponentBase, IAsyncDisposable
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
     private string _query = string.Empty;
+    private string _searchMode = "hybrid";
     private string? _selectedFileType;
     private string? _selectedProject;
     private List<SearchResult>? _results;
@@ -79,7 +81,7 @@ public partial class Search : ComponentBase, IAsyncDisposable
         try
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            _results = await DashboardService.SearchAsync(_query, 50); // Get more results for filtering
+            _results = await DashboardService.SearchAsync(_query, 50, _searchMode); // Get more results for filtering
             sw.Stop();
             _searchDuration = sw.Elapsed;
 
@@ -102,6 +104,15 @@ public partial class Search : ComponentBase, IAsyncDisposable
         }
     }
 
+    private async Task OnSearchModeChanged(string value)
+    {
+        _searchMode = value;
+        if (!string.IsNullOrWhiteSpace(_query))
+        {
+            await RunSearchAsync();
+        }
+    }
+
     private void OnFileTypeChanged(string? value)
     {
         _selectedFileType = value;
@@ -113,6 +124,27 @@ public partial class Search : ComponentBase, IAsyncDisposable
         _selectedProject = value;
         ApplyFilters();
     }
+
+    private string GetSearchPlaceholder() => _searchMode switch
+    {
+        "semantic" => "Search code semantically... (e.g., 'function that handles user authentication')",
+        "lexical" => "Search for exact keywords... (e.g., 'getUserById')",
+        _ => "Search code... (combines semantic understanding with keyword matching)"
+    };
+
+    private string GetSearchModeTooltip() => _searchMode switch
+    {
+        "semantic" => "Semantic search uses AI embeddings to find conceptually similar code, even with different wording.",
+        "lexical" => "Lexical search (BM25) finds exact keyword matches, great for function names and identifiers.",
+        _ => "Hybrid search combines semantic and lexical results using Reciprocal Rank Fusion for best results."
+    };
+
+    private string GetSearchModeIcon() => _searchMode switch
+    {
+        "semantic" => Icons.Material.Filled.Psychology,
+        "lexical" => Icons.Material.Filled.TextFields,
+        _ => Icons.Material.Filled.AutoAwesome
+    };
 
     private void ApplyFilters()
     {
