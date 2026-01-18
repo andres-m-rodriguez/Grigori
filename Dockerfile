@@ -13,7 +13,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Build
 # -----------------------------------------------------------------------------
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 WORKDIR /src
 
@@ -31,9 +31,10 @@ RUN dotnet restore src/Grigori.Mcp/Grigori.Mcp.csproj
 # Copy source code
 COPY src/ src/
 
-# Build and publish
+# Build and publish for linux-x64
 RUN dotnet publish src/Grigori.Mcp/Grigori.Mcp.csproj \
     -c Release \
+    -r linux-x64 \
     -o /app/publish \
     --no-restore \
     /p:PublishSingleFile=true \
@@ -61,24 +62,24 @@ RUN curl -L -o model.onnx \
 # -----------------------------------------------------------------------------
 # Stage 3: Runtime Base
 # -----------------------------------------------------------------------------
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-alpine AS runtime-base
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0 AS runtime-base
 
 # Install native dependencies for ONNX Runtime
-RUN apk add --no-cache \
-    libstdc++ \
-    libgcc \
-    icu-libs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user for security
-RUN addgroup -S grigori && adduser -S grigori -G grigori
+# Create non-root user for security with home directory
+RUN groupadd -r grigori && useradd -r -g grigori -m -d /home/grigori grigori
 
 # Set up directories
 WORKDIR /app
 RUN mkdir -p /data/models /data/index && \
-    chown -R grigori:grigori /app /data
+    chown -R grigori:grigori /app /data /home/grigori
 
 # Environment configuration
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    DOTNET_BUNDLE_EXTRACT_BASE_DIR=/home/grigori/.net \
     GRIGORI__ONNX__MODELPATH=/data/models/model.onnx \
     GRIGORI__ONNX__VOCABPATH=/data/models/vocab.txt \
     GRIGORI__INDEXPATH=/data/index/grigori.db \
@@ -100,6 +101,9 @@ LABEL org.opencontainers.image.title="Grigori MCP Server (Slim)" \
 # Copy published app
 COPY --from=build --chown=grigori:grigori /app/publish/Grigori.Mcp /app/grigori
 
+# Copy wwwroot for dashboard static files
+COPY --from=build --chown=grigori:grigori /app/publish/wwwroot /app/wwwroot
+
 # Volume for persistent data (models + index)
 VOLUME ["/data"]
 
@@ -119,6 +123,9 @@ LABEL org.opencontainers.image.title="Grigori MCP Server (Full)" \
 
 # Copy published app
 COPY --from=build --chown=grigori:grigori /app/publish/Grigori.Mcp /app/grigori
+
+# Copy wwwroot for dashboard static files
+COPY --from=build --chown=grigori:grigori /app/publish/wwwroot /app/wwwroot
 
 # Copy pre-downloaded model
 COPY --from=model-downloader --chown=grigori:grigori /models/model.onnx /data/models/model.onnx

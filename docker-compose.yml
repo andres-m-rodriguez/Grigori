@@ -1,41 +1,55 @@
 # =============================================================================
-# Grigori MCP Server - Docker Compose
+# Grigori Server - Docker Compose
 # =============================================================================
+# A shared semantic code search server with REST API and Dashboard
+#
 # Usage:
-#   Full image (model baked in):
-#     docker compose up grigori-full
+#   Start server:
+#     docker compose up -d
 #
-#   Slim image (downloads model on first run):
-#     docker compose up grigori-slim
+#   View logs:
+#     docker compose logs -f
 #
-#   Build both images:
-#     docker compose build
+#   Index a project via API:
+#     curl -X POST http://localhost:5151/api/index -H "Content-Type: application/json" \
+#       -d '{"path": "/projects/myproject"}'
+#
+#   Search:
+#     curl -X POST http://localhost:5151/api/search -H "Content-Type: application/json" \
+#       -d '{"query": "authentication logic", "limit": 10}'
+#
+#   Dashboard:
+#     http://localhost:5151/dashboard
 # =============================================================================
 
 services:
-  # ---------------------------------------------------------------------------
-  # Full Image - Model baked in, zero startup delay
-  # ---------------------------------------------------------------------------
-  grigori-full:
+  grigori:
     build:
       context: .
       dockerfile: Dockerfile
       target: full
-    image: grigori:full
-    container_name: grigori-full
+    image: grigori:latest
+    container_name: grigori
+    ports:
+      - "5151:5151"
     volumes:
-      # Persist the search index between restarts
+      # Persist the search index
       - grigori-index:/data/index
-      # Mount your codebase for indexing (read-only)
-      - ${CODEBASE_PATH:-./}:/workspace:ro
+      # Mount projects for indexing (add your own paths)
+      # - /path/to/project1:/projects/project1:ro
+      # - /path/to/project2:/projects/project2:ro
     environment:
-      - GRIGORI__WATCHEDDIRECTORIES__0=/workspace
-    stdin_open: true
-    tty: true
+      - GRIGORI__DASHBOARD__PORT=5151
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5151/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # ---------------------------------------------------------------------------
-  # Slim Image - Downloads model on first run, smaller image
+  # Slim variant - downloads model on first run (smaller image)
   # ---------------------------------------------------------------------------
   grigori-slim:
     build:
@@ -44,43 +58,19 @@ services:
       target: slim
     image: grigori:slim
     container_name: grigori-slim
+    ports:
+      - "5151:5151"
     volumes:
-      # Persist models and index between restarts
+      # Persist models and index
       - grigori-data:/data
-      # Mount your codebase for indexing (read-only)
-      - ${CODEBASE_PATH:-./}:/workspace:ro
     environment:
-      - GRIGORI__WATCHEDDIRECTORIES__0=/workspace
-    stdin_open: true
-    tty: true
+      - GRIGORI__DASHBOARD__PORT=5151
     restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
-  # Development - Build from source with hot reload
-  # ---------------------------------------------------------------------------
-  grigori-dev:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: build
-    image: grigori:dev
-    container_name: grigori-dev
-    working_dir: /src
-    volumes:
-      - .:/src:ro
-      - grigori-dev-data:/data
-      - ${CODEBASE_PATH:-./}:/workspace:ro
-    environment:
-      - DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true
-      - GRIGORI__WATCHEDDIRECTORIES__0=/workspace
-    command: dotnet watch run --project src/Grigori.Mcp/Grigori.Mcp.csproj
-    stdin_open: true
-    tty: true
+    profiles:
+      - slim
 
 volumes:
   grigori-index:
     name: grigori-index
   grigori-data:
     name: grigori-data
-  grigori-dev-data:
-    name: grigori-dev-data

@@ -1,3 +1,4 @@
+using Grigori.Contracts.Dtos.Index;
 using Grigori.Contracts.Interfaces;
 using Grigori.Contracts.Options;
 using Grigori.Database;
@@ -18,9 +19,17 @@ using ModelContextProtocol.Server;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Check if running in MCP mode (default) or dashboard-only mode
-var dashboardOnly = args.Contains("--dashboard");
+// Check run mode
+var mcpMode = args.Contains("--mcp");           // stdio MCP mode (for local use)
+var serverMode = args.Contains("--server");      // HTTP server mode (for Docker/shared)
+var dashboardOnly = args.Contains("--dashboard"); // Dashboard only
+
 var dashboardPort = builder.Configuration.GetValue("Grigori:Dashboard:Port", 5151);
+var apiPort = builder.Configuration.GetValue("Grigori:Api:Port", 5152);
+
+// Default to server mode if no flags provided
+if (!mcpMode && !dashboardOnly)
+    serverMode = true;
 
 // Add configuration
 var projectDir = AppContext.BaseDirectory;
@@ -46,9 +55,20 @@ builder.Services.AddScoped<DashboardService>();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-if (!dashboardOnly)
+// Add CORS for API access
+builder.Services.AddCors(options =>
 {
-    // Register MCP tool endpoints
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
+if (mcpMode)
+{
+    // Register MCP tool endpoints for stdio mode
     builder.Services.AddScoped<SearchEndpoints>();
     builder.Services.AddScoped<IndexEndpoints>();
     builder.Services.AddScoped<MetricsEndpoints>();
@@ -61,15 +81,105 @@ if (!dashboardOnly)
         .WithToolsFromAssembly();
 }
 
-// Configure Kestrel for dashboard
+// Configure Kestrel
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.ListenLocalhost(dashboardPort);
+    options.ListenAnyIP(dashboardPort);  // Dashboard + API
 });
 
 var app = builder.Build();
 
-// Redirect root to dashboard (before path base)
+app.UseCors();
+
+// ============================================================================
+// REST API Endpoints (for Docker/shared mode)
+// ============================================================================
+
+app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
+    .WithTags("Health");
+
+app.MapGet("/api/status", (IMetricsService metrics) =>
+{
+    var snapshot = metrics.GetSnapshot();
+    return Results.Ok(snapshot);
+}).WithTags("Status");
+
+// Search API
+app.MapPost("/api/search", async (SearchRequest request, ISearchService searchService, CancellationToken ct) =>
+{
+    var result = await searchService.SearchAsync(new Grigori.Contracts.Dtos.Search.SearchRequestDto
+    {
+        Query = request.Query,
+        Limit = request.Limit ?? 10,
+        FileTypes = request.FileTypes,
+        OutputMode = request.OutputMode ?? "full"
+    }, ct);
+
+    return result.Match(
+        success => Results.Ok(success),
+        error => Results.BadRequest(new { error = error.Message })
+    );
+}).WithTags("Search");
+
+// Index API - for indexing mounted directories
+app.MapPost("/api/index", async (IndexRequest request, IIndexService indexService, CancellationToken ct) =>
+{
+    if (string.IsNullOrEmpty(request.Path))
+        return Results.BadRequest(new { error = "Path is required" });
+
+    var result = await indexService.IndexDirectoryAsync(new IndexRequestDto { Path = request.Path }, ct);
+
+    return result.Match(
+        success => Results.Ok(success),
+        error => Results.BadRequest(new { error = error.Message })
+    );
+}).WithTags("Index");
+
+// Index API - for indexing files sent over the network
+app.MapPost("/api/index/files", async Task<IResult> (IndexFilesRequest request, IIndexService indexService, CancellationToken ct) =>
+{
+    if (request.Files is null || request.Files.Count == 0)
+        return Results.BadRequest(new { error = "Files are required" });
+
+    // Create temp directory for files
+    var tempDir = Path.Combine(Path.GetTempPath(), "grigori-index", Guid.NewGuid().ToString());
+    Directory.CreateDirectory(tempDir);
+
+    try
+    {
+        // Write files to temp directory preserving structure
+        foreach (var file in request.Files)
+        {
+            var filePath = Path.Combine(tempDir, file.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+            var fileDir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(fileDir))
+                Directory.CreateDirectory(fileDir);
+            await File.WriteAllTextAsync(filePath, file.Content, ct);
+        }
+
+        // Index the temp directory
+        var result = await indexService.IndexDirectoryAsync(new IndexRequestDto
+        {
+            Path = tempDir
+        }, ct);
+
+        return result.Match(
+            success => Results.Ok(success),
+            error => Results.BadRequest(new { error = error.Message })
+        );
+    }
+    finally
+    {
+        // Cleanup temp directory
+        try { Directory.Delete(tempDir, true); } catch { }
+    }
+}).WithTags("Index");
+
+// ============================================================================
+// Dashboard (Blazor)
+// ============================================================================
+
+// Redirect root to dashboard
 app.MapGet("/", () => Results.Redirect("/dashboard"));
 
 // Configure Blazor dashboard at /dashboard path
@@ -80,19 +190,32 @@ app.UseAntiforgery();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-if (dashboardOnly)
+// ============================================================================
+// Startup
+// ============================================================================
+
+if (mcpMode)
 {
-    Console.WriteLine($"Grigori Dashboard running at http://localhost:{dashboardPort}/dashboard");
-    await app.RunAsync();
+    // MCP stdio mode - runs MCP server + dashboard
+    Console.Error.WriteLine($"Grigori MCP Server started. Dashboard at http://localhost:{dashboardPort}/dashboard");
+    _ = Task.Run(() => app.RunAsync());
+    await Task.Delay(Timeout.Infinite);
 }
 else
 {
-    // Run both MCP and dashboard
-    Console.Error.WriteLine($"Grigori MCP Server started. Dashboard at http://localhost:{dashboardPort}/dashboard");
-
-    // Start the web server in background
-    _ = Task.Run(() => app.RunAsync());
-
-    // The MCP server runs via the hosted service registered by AddMcpServer
-    await Task.Delay(Timeout.Infinite);
+    // Server mode - HTTP API + Dashboard
+    Console.WriteLine($"Grigori Server started");
+    Console.WriteLine($"  Dashboard: http://localhost:{dashboardPort}/dashboard");
+    Console.WriteLine($"  API:       http://localhost:{dashboardPort}/api");
+    Console.WriteLine($"  Health:    http://localhost:{dashboardPort}/api/health");
+    await app.RunAsync();
 }
+
+// ============================================================================
+// Request DTOs
+// ============================================================================
+
+record SearchRequest(string Query, int? Limit, string? FileTypes, string? OutputMode);
+record IndexRequest(string Path);
+record IndexFilesRequest(List<FileContent> Files);
+record FileContent(string RelativePath, string Content);
