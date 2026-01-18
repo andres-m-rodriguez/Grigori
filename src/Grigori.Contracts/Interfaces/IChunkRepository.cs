@@ -30,6 +30,13 @@ public interface IChunkRepository
         string filePath,
         string hash,
         CancellationToken cancellationToken = default);
+
+    Task<Result<List<SearchResultItem>, GrigoriError>> GetChunksByIdsAsync(
+        IReadOnlyList<long> ids,
+        CancellationToken cancellationToken = default);
+
+    Task<IEnumerable<(long Id, float[] Embedding)>> GetAllEmbeddingsAsync(
+        CancellationToken cancellationToken = default);
 }
 
 public record CodeChunkInput

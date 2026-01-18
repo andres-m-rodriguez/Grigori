@@ -3,9 +3,12 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Grigori.Contracts.Dtos.Search;
 using Grigori.Contracts.Interfaces;
+using Grigori.Contracts.Options;
 using Grigori.Contracts.Results;
 using Grigori.Infrastructure.Chunking;
+using Grigori.Infrastructure.Indexing;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Grigori.Mcp.Features.Search.Services;
 
@@ -14,6 +17,8 @@ public class SearchService : ISearchService
     private readonly IChunkRepository _chunkRepository;
     private readonly IEmbeddingProvider _embeddingProvider;
     private readonly IMetricsService _metricsService;
+    private readonly HnswIndex _hnswIndex;
+    private readonly GrigoriOptions _options;
     private readonly ILogger<SearchService> _logger;
 
     private const float DefaultScoreThreshold = 0.3f;
@@ -25,11 +30,15 @@ public class SearchService : ISearchService
         IChunkRepository chunkRepository,
         IEmbeddingProvider embeddingProvider,
         IMetricsService metricsService,
+        HnswIndex hnswIndex,
+        IOptions<GrigoriOptions> options,
         ILogger<SearchService> logger)
     {
         _chunkRepository = chunkRepository;
         _embeddingProvider = embeddingProvider;
         _metricsService = metricsService;
+        _hnswIndex = hnswIndex;
+        _options = options.Value;
         _logger = logger;
     }
 
@@ -68,21 +77,65 @@ public class SearchService : ISearchService
                     .ToList();
             }
 
-            // Search repository
-            var searchResult = await _chunkRepository.SearchAsync(
-                queryEmbedding,
-                request.Limit * 2,
-                DefaultScoreThreshold,
-                requiredFeatures: null,
-                fileExtensions: fileExtensions,
-                cancellationToken);
+            // Try HNSW search first if enabled and index is built
+            var usedHnsw = false;
+            List<SearchResultItem> results;
 
-            if (searchResult.IsFailure)
+            if (_options.Hnsw.Enabled && _hnswIndex.IsBuilt && fileExtensions == null)
             {
-                return searchResult.Error;
-            }
+                // Use HNSW for approximate nearest neighbor search
+                var hnswResults = _hnswIndex.Search(queryEmbedding, request.Limit * 2);
 
-            var results = searchResult.Value;
+                if (hnswResults.Count > 0)
+                {
+                    usedHnsw = true;
+                    var candidateIds = hnswResults
+                        .Where(r => HnswIndex.DistanceToSimilarity(r.Distance) >= DefaultScoreThreshold)
+                        .Select(r => r.Id)
+                        .ToList();
+
+                    var chunksResult = await _chunkRepository.GetChunksByIdsAsync(candidateIds, cancellationToken);
+                    if (chunksResult.IsFailure)
+                    {
+                        return chunksResult.Error;
+                    }
+
+                    // Create a lookup for HNSW distances
+                    var distanceLookup = hnswResults.ToDictionary(r => r.Id, r => r.Distance);
+
+                    // Set scores from HNSW distances
+                    results = chunksResult.Value.Select(r => r with
+                    {
+                        Score = distanceLookup.TryGetValue(r.Id, out var distance)
+                            ? HnswIndex.DistanceToSimilarity(distance)
+                            : r.Score
+                    }).ToList();
+
+                    _logger.LogDebug("HNSW search returned {Count} results", results.Count);
+                }
+                else
+                {
+                    results = [];
+                }
+            }
+            else
+            {
+                // Fall back to linear scan (required when filtering by file extensions)
+                var searchResult = await _chunkRepository.SearchAsync(
+                    queryEmbedding,
+                    request.Limit * 2,
+                    DefaultScoreThreshold,
+                    requiredFeatures: null,
+                    fileExtensions: fileExtensions,
+                    cancellationToken);
+
+                if (searchResult.IsFailure)
+                {
+                    return searchResult.Error;
+                }
+
+                results = searchResult.Value;
+            }
 
             // Apply feature boosting
             if (queryFeatures.Count > 0)
@@ -97,7 +150,7 @@ public class SearchService : ISearchService
                 .ToList();
 
             stopwatch.Stop();
-            await _metricsService.RecordSearchAsync(request.Query, stopwatch.ElapsedMilliseconds, finalResults.Count, cacheHit, false, cancellationToken);
+            await _metricsService.RecordSearchAsync(request.Query, stopwatch.ElapsedMilliseconds, finalResults.Count, cacheHit, usedHnsw, cancellationToken);
 
             // Format results based on output mode
             var formattedResults = FormatResults(finalResults, request.OutputMode);
