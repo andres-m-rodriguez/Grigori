@@ -1,3 +1,4 @@
+using Grigori.Contracts.Dtos.Metrics;
 using Grigori.Contracts.Interfaces;
 using Grigori.Database;
 using Grigori.Infrastructure.Indexing;
@@ -221,6 +222,78 @@ public class DashboardService
 
         var denom = MathF.Sqrt(normA) * MathF.Sqrt(normB);
         return denom > 0 ? dot / denom : 0f;
+    }
+
+    public async Task<List<ActivityLogDto>> GetRecentActivityAsync(int limit = 20)
+    {
+        var logs = await _dbContext.GetRecentActivityLogsAsync(limit);
+        return logs.Select(l => new ActivityLogDto
+        {
+            Id = l.Id,
+            ActivityType = l.ActivityType,
+            Description = l.Description,
+            DurationMs = l.DurationMs,
+            Timestamp = l.Timestamp,
+            Details = l.Details
+        }).ToList();
+    }
+
+    public async Task<List<SearchHistoryDto>> GetSearchHistoryAsync(int limit = 20)
+    {
+        var history = await _dbContext.GetRecentSearchHistoryAsync(limit);
+        return history.Select(h => new SearchHistoryDto
+        {
+            Id = h.Id,
+            Query = h.Query,
+            ResultCount = h.ResultCount,
+            DurationMs = h.DurationMs,
+            CacheHit = h.CacheHit,
+            UsedHnsw = h.UsedHnsw,
+            Timestamp = h.Timestamp
+        }).ToList();
+    }
+
+    public async Task<List<PerformanceDataPointDto>> GetPerformanceMetricsAsync(int hoursBack = 24)
+    {
+        var dbMetrics = await _dbContext.GetHourlyPerformanceMetricsAsync(hoursBack);
+
+        // Create a lookup for the actual data
+        var metricsLookup = dbMetrics.ToDictionary(
+            m => m.Hour.ToString("yyyy-MM-dd HH:00"),
+            m => (m.AvgSearchTimeMs, m.AvgIndexTimeMs));
+
+        // Generate all hours in the range
+        var result = new List<PerformanceDataPointDto>();
+        var now = DateTime.UtcNow;
+        var startHour = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, DateTimeKind.Utc)
+            .AddHours(-hoursBack + 1);
+
+        for (int i = 0; i < hoursBack; i++)
+        {
+            var hour = startHour.AddHours(i);
+            var key = hour.ToString("yyyy-MM-dd HH:00");
+
+            if (metricsLookup.TryGetValue(key, out var data))
+            {
+                result.Add(new PerformanceDataPointDto
+                {
+                    Timestamp = hour,
+                    AvgSearchTimeMs = data.AvgSearchTimeMs,
+                    AvgIndexTimeMs = data.AvgIndexTimeMs
+                });
+            }
+            else
+            {
+                result.Add(new PerformanceDataPointDto
+                {
+                    Timestamp = hour,
+                    AvgSearchTimeMs = 0,
+                    AvgIndexTimeMs = 0
+                });
+            }
+        }
+
+        return result;
     }
 }
 

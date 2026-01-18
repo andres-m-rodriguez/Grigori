@@ -1,4 +1,5 @@
 @page "/dashboard"
+@using Grigori.Contracts.Dtos.Metrics
 @inject DashboardService DashboardService
 
 <PageTitle>Dashboard - Grigori</PageTitle>
@@ -104,6 +105,102 @@ else if (_stats != null)
             }
         </MudGrid>
     }
+
+    @* Performance Metrics Chart *@
+    @if (_performanceData.Count > 0)
+    {
+        <MudText Typo="Typo.h5" Class="mb-4 mt-6">Performance Metrics</MudText>
+        <MudPaper Elevation="1" Class="pa-4 mb-6">
+            <MudChart ChartType="ChartType.Line"
+                      ChartSeries="@_chartSeries"
+                      XAxisLabels="@_chartLabels"
+                      ChartOptions="@_chartOptions"
+                      Height="300px" />
+            <MudStack Row="true" Justify="Justify.Center" Class="mt-2">
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">Search Time (ms)</MudChip>
+                <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Filled">Index Time (ms)</MudChip>
+            </MudStack>
+        </MudPaper>
+    }
+
+    @* Activity and Search History *@
+    <MudGrid Spacing="3" Class="mt-4">
+        @* Recent Indexing Activity *@
+        <MudItem xs="12" md="6">
+            <MudText Typo="Typo.h5" Class="mb-4">Recent Indexing Activity</MudText>
+            <MudPaper Elevation="1" Class="pa-4" Style="max-height: 400px; overflow-y: auto;">
+                @if (_activityLogs.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">No indexing activity yet.</MudAlert>
+                }
+                else
+                {
+                    <MudList T="ActivityLogDto" Dense="true">
+                        @foreach (var activity in _activityLogs)
+                        {
+                            <MudListItem T="ActivityLogDto" Icon="@Icons.Material.Filled.Storage">
+                                <div class="d-flex justify-space-between align-center" style="width: 100%;">
+                                    <div>
+                                        <MudText Typo="Typo.body2">@activity.Description</MudText>
+                                        <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
+                                            @activity.RelativeTime
+                                        </MudText>
+                                    </div>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info">
+                                        @activity.FormattedDuration
+                                    </MudChip>
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @* Search Query History *@
+        <MudItem xs="12" md="6">
+            <MudText Typo="Typo.h5" Class="mb-4">Search Query History</MudText>
+            <MudPaper Elevation="1" Class="pa-4" Style="max-height: 400px; overflow-y: auto;">
+                @if (_searchHistory.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">No search queries yet.</MudAlert>
+                }
+                else
+                {
+                    <MudList T="SearchHistoryDto" Dense="true">
+                        @foreach (var search in _searchHistory)
+                        {
+                            <MudListItem T="SearchHistoryDto" Icon="@Icons.Material.Filled.Search">
+                                <div class="d-flex justify-space-between align-center" style="width: 100%;">
+                                    <div style="flex: 1; min-width: 0;">
+                                        <MudText Typo="Typo.body2" Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                            @search.TruncatedQuery
+                                        </MudText>
+                                        <MudStack Row="true" Spacing="1">
+                                            <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
+                                                @search.RelativeTime
+                                            </MudText>
+                                            <MudText Typo="Typo.caption">|</MudText>
+                                            <MudText Typo="Typo.caption" Color="@(search.ResultCount > 0 ? Color.Success : Color.Warning)">
+                                                @search.ResultCount results
+                                            </MudText>
+                                            @if (search.CacheHit)
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.Cached" Size="Size.Small" Color="Color.Info" Title="Cache Hit" />
+                                            }
+                                        </MudStack>
+                                    </div>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info">
+                                        @search.FormattedDuration
+                                    </MudChip>
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
 }
 else
 {
@@ -115,7 +212,19 @@ else
 @code {
     private IndexStats? _stats;
     private List<IndexedProject> _projects = [];
+    private List<ActivityLogDto> _activityLogs = [];
+    private List<SearchHistoryDto> _searchHistory = [];
+    private List<PerformanceDataPointDto> _performanceData = [];
     private bool _loading = true;
+
+    // Chart data
+    private List<ChartSeries> _chartSeries = [];
+    private string[] _chartLabels = [];
+    private ChartOptions _chartOptions = new()
+    {
+        YAxisTicks = 5,
+        LineStrokeWidth = 2
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -127,12 +236,50 @@ else
         _loading = true;
         try
         {
-            _stats = await DashboardService.GetIndexStatsAsync();
-            _projects = await DashboardService.GetIndexedProjectsAsync();
+            // Load all data in parallel
+            var statsTask = DashboardService.GetIndexStatsAsync();
+            var projectsTask = DashboardService.GetIndexedProjectsAsync();
+            var activityTask = DashboardService.GetRecentActivityAsync(10);
+            var searchHistoryTask = DashboardService.GetSearchHistoryAsync(10);
+            var performanceTask = DashboardService.GetPerformanceMetricsAsync(24);
+
+            await Task.WhenAll(statsTask, projectsTask, activityTask, searchHistoryTask, performanceTask);
+
+            _stats = statsTask.Result;
+            _projects = projectsTask.Result;
+            _activityLogs = activityTask.Result;
+            _searchHistory = searchHistoryTask.Result;
+            _performanceData = performanceTask.Result;
+
+            // Prepare chart data
+            PrepareChartData();
         }
         finally
         {
             _loading = false;
         }
+    }
+
+    private void PrepareChartData()
+    {
+        if (_performanceData.Count == 0)
+            return;
+
+        // Show labels every 4 hours to avoid clutter
+        _chartLabels = _performanceData.Select((p, i) => i % 4 == 0 ? p.FormattedHour : "").ToArray();
+
+        _chartSeries =
+        [
+            new ChartSeries
+            {
+                Name = "Search Time (ms)",
+                Data = _performanceData.Select(p => p.AvgSearchTimeMs).ToArray()
+            },
+            new ChartSeries
+            {
+                Name = "Index Time (ms)",
+                Data = _performanceData.Select(p => p.AvgIndexTimeMs).ToArray()
+            }
+        ];
     }
 }
