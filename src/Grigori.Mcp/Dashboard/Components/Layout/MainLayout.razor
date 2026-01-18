@@ -1,26 +1,109 @@
 @inherits LayoutComponentBase
+@inject DashboardService DashboardService
 
-<div class="layout">
-    <header class="header">
-        <div class="logo">
-            <span class="logo-icon">◈</span>
-            <span class="logo-text">Grigori</span>
-        </div>
-        <nav class="nav">
-            <NavLink class="nav-link" href="/dashboard" Match="NavLinkMatch.All">
+<MudThemeProvider IsDarkMode="true" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Dense="true">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="ToggleDrawer" />
+        <MudIcon Icon="@Icons.Material.Filled.Hub" Class="mr-2" />
+        <MudText Typo="Typo.h6">Grigori</MudText>
+        <MudSpacer />
+        <MudChip T="string" Icon="@Icons.Material.Filled.Storage" Size="Size.Small" Variant="Variant.Text">
+            @_totalChunks.ToString("N0") chunks
+        </MudChip>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" Variant="DrawerVariant.Mini" OpenMiniOnHover="true">
+        <MudNavMenu>
+            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">
+                Home
+            </MudNavLink>
+            <MudNavLink Href="dashboard" Icon="@Icons.Material.Filled.Dashboard">
                 Dashboard
-            </NavLink>
-            <NavLink class="nav-link" href="/dashboard/search">
+            </MudNavLink>
+            <MudNavLink Href="search" Icon="@Icons.Material.Filled.Search">
                 Search
-            </NavLink>
-        </nav>
-    </header>
+            </MudNavLink>
+            <MudNavGroup Title="Tools" Icon="@Icons.Material.Filled.Build" Expanded="false">
+                <MudNavLink Href="tools/cli" Icon="@Icons.Material.Filled.Terminal">
+                    CLI
+                </MudNavLink>
+            </MudNavGroup>
+        </MudNavMenu>
 
-    <main class="main">
-        @Body
-    </main>
+        <MudDivider Class="my-2" />
 
-    <footer class="footer">
-        <span>Grigori MCP Server</span>
-    </footer>
-</div>
+        <MudText Typo="Typo.overline" Class="px-4 mt-2" Style="color: var(--mud-palette-text-secondary);">
+            Projects
+        </MudText>
+
+        @if (_loading)
+        {
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mx-4 my-2" />
+        }
+        else if (_projects.Count == 0)
+        {
+            <MudText Typo="Typo.caption" Class="px-4" Style="color: var(--mud-palette-text-disabled);">
+                No projects indexed
+            </MudText>
+        }
+        else
+        {
+            <MudNavMenu Dense="true">
+                @foreach (var project in _projects)
+                {
+                    <MudNavLink Icon="@Icons.Material.Filled.Folder">
+                        <div class="d-flex flex-column">
+                            <MudText Typo="Typo.body2">@project.Name</MudText>
+                            <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
+                                @project.FileCount files
+                            </MudText>
+                        </div>
+                    </MudNavLink>
+                }
+            </MudNavMenu>
+        }
+
+        <MudSpacer />
+
+        <MudDivider Class="my-2" />
+        <div class="pa-4">
+            <MudChip T="string" Icon="@Icons.Material.Filled.Circle" Size="Size.Small" Color="Color.Success" Variant="Variant.Text">
+                Server Online
+            </MudChip>
+        </div>
+    </MudDrawer>
+
+    <MudMainContent Class="pt-16 px-4">
+        <MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+    private List<IndexedProject> _projects = [];
+    private bool _loading = true;
+    private int _totalChunks = 0;
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _projects = await DashboardService.GetIndexedProjectsAsync();
+            var stats = await DashboardService.GetIndexStatsAsync();
+            _totalChunks = stats?.TotalChunks ?? 0;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
