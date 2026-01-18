@@ -206,9 +206,6 @@ app.MapPost("/api/index/files", async Task<IResult> (IndexFilesRequest request, 
 // Dashboard (Blazor)
 // ============================================================================
 
-// Redirect root to dashboard
-app.MapGet("/", () => Results.Redirect("/dashboard"));
-
 // Configure Blazor dashboard at /dashboard path
 app.UsePathBase("/dashboard");
 app.UseStaticFiles();
