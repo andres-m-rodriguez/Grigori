@@ -85,7 +85,15 @@ public class IndexService : IIndexService
             {
                 try
                 {
-                    var result = await IndexFileCoreAsync(file, cancellationToken);
+                    // If ProjectName is set, use it to create a clean path like "ProjectName/relative/path"
+                    var storedPath = file;
+                    if (!string.IsNullOrEmpty(request.ProjectName))
+                    {
+                        var relativePath = Path.GetRelativePath(request.Path, file).Replace('\\', '/');
+                        storedPath = $"{request.ProjectName}/{relativePath}";
+                    }
+
+                    var result = await IndexFileCoreAsync(file, storedPath, cancellationToken);
                     if (result.IsSuccess && result.Value > 0)
                     {
                         totalFilesIndexed++;
@@ -133,7 +141,7 @@ public class IndexService : IIndexService
 
         try
         {
-            var chunkCount = await IndexFileCoreAsync(filePath, cancellationToken);
+            var chunkCount = await IndexFileCoreAsync(filePath, filePath, cancellationToken);
             if (chunkCount.IsFailure)
             {
                 return chunkCount.Error;
@@ -172,23 +180,24 @@ public class IndexService : IIndexService
         return result.Value;
     }
 
-    private async Task<Result<int, GrigoriError>> IndexFileCoreAsync(string filePath, CancellationToken cancellationToken)
+    private async Task<Result<int, GrigoriError>> IndexFileCoreAsync(string filePath, string storedPath, CancellationToken cancellationToken)
     {
         var content = await File.ReadAllTextAsync(filePath, cancellationToken);
         var contentHash = GrigoriDbContext.ComputeHash(content);
 
-        if (await _chunkRepository.HasContentHashAsync(filePath, contentHash, cancellationToken))
+        if (await _chunkRepository.HasContentHashAsync(storedPath, contentHash, cancellationToken))
         {
-            _logger.LogDebug("File already indexed with same content: {FilePath}", filePath);
+            _logger.LogDebug("File already indexed with same content: {FilePath}", storedPath);
             return 0;
         }
 
-        await _chunkRepository.DeleteByFilePathAsync(filePath, cancellationToken);
+        await _chunkRepository.DeleteByFilePathAsync(storedPath, cancellationToken);
 
-        var chunks = _chunkingService.ChunkFile(filePath, content);
+        // Use storedPath for the chunks so the database has clean paths
+        var chunks = _chunkingService.ChunkFile(storedPath, content);
         if (chunks.Count == 0)
         {
-            _logger.LogDebug("No chunks created for: {FilePath}", filePath);
+            _logger.LogDebug("No chunks created for: {FilePath}", storedPath);
             return 0;
         }
 
@@ -210,7 +219,7 @@ public class IndexService : IIndexService
             return insertResult.Error;
         }
 
-        _logger.LogInformation("Indexed {ChunkCount} chunks from {FilePath}", chunks.Count, filePath);
+        _logger.LogInformation("Indexed {ChunkCount} chunks from {FilePath}", chunks.Count, storedPath);
         return chunks.Count;
     }
 

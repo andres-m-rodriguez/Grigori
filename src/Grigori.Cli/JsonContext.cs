@@ -12,7 +12,7 @@ internal partial class JsonContext : JsonSerializerContext
 
 public record FileContent(string RelativePath, string Content);
 
-public record IndexFilesRequest(List<FileContent> Files);
+public record IndexFilesRequest(string ProjectName, List<FileContent> Files);
 
 public record IndexFilesResponse(
     bool Success,

@@ -24,7 +24,7 @@ public class GrigoriClient
     {
         try
         {
-            var request = new IndexFilesRequest(files);
+            var request = new IndexFilesRequest(projectName, files);
 
             var response = await _httpClient.PostAsJsonAsync(
                 $"{_baseUrl}/api/index/files",
