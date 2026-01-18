@@ -31,6 +31,13 @@ public interface IChunkRepository
         string hash,
         CancellationToken cancellationToken = default);
 
+    Task<Result<List<SearchResultItem>, GrigoriError>> GetChunksByIdsAsync(
+        IReadOnlyList<long> ids,
+        CancellationToken cancellationToken = default);
+
+    Task<IEnumerable<(long Id, float[] Embedding)>> GetAllEmbeddingsAsync(
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Gets all chunks for lexical (BM25) search.
     /// Returns chunk metadata and content without embeddings for efficiency.

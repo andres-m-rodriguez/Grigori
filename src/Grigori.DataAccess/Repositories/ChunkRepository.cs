@@ -147,6 +147,47 @@ public class ChunkRepository : IChunkRepository
         return await _dbContext.HasContentHashAsync(filePath, hash, cancellationToken);
     }
 
+    public async Task<Result<List<SearchResultItem>, GrigoriError>> GetChunksByIdsAsync(
+        IReadOnlyList<long> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return new List<SearchResultItem>();
+        }
+
+        try
+        {
+            var chunks = await _dbContext.GetChunksByIdsAsync(ids, cancellationToken);
+
+            var results = chunks.Select(chunk => new SearchResultItem
+            {
+                Id = chunk.Id,
+                FilePath = chunk.FilePath,
+                StartLine = chunk.StartLine,
+                EndLine = chunk.EndLine,
+                Content = chunk.Content,
+                Score = 0f, // Score will be set by caller based on HNSW distance
+                Features = chunk.Features?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() ?? []
+            }).ToList();
+
+            return results;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get chunks by IDs");
+            return GrigoriError.DatabaseError($"Failed to get chunks by IDs: {ex.Message}", ex);
+        }
+    }
+
+    public async Task<IEnumerable<(long Id, float[] Embedding)>> GetAllEmbeddingsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var chunks = await _dbContext.GetAllChunksAsync(cancellationToken);
+
+        return chunks.Select(chunk => (chunk.Id, DeserializeEmbedding(chunk.Embedding)));
+    }
+
     public async Task<Result<List<ChunkForLexicalSearch>, GrigoriError>> GetChunksForLexicalSearchAsync(
         List<string>? fileExtensions = null,
         CancellationToken cancellationToken = default)
