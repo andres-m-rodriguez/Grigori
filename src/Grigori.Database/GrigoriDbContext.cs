@@ -53,6 +53,30 @@ public class GrigoriDbContext : IDisposable, IAsyncDisposable
 
             CREATE INDEX IF NOT EXISTS idx_chunks_file_path ON chunks(file_path);
             CREATE INDEX IF NOT EXISTS idx_chunks_content_hash ON chunks(content_hash);
+
+            CREATE TABLE IF NOT EXISTS activity_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                activity_type TEXT NOT NULL,
+                description TEXT NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                timestamp TEXT NOT NULL,
+                details TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log(timestamp);
+            CREATE INDEX IF NOT EXISTS idx_activity_log_type ON activity_log(activity_type);
+
+            CREATE TABLE IF NOT EXISTS search_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                query TEXT NOT NULL,
+                result_count INTEGER NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                cache_hit INTEGER NOT NULL,
+                used_hnsw INTEGER NOT NULL,
+                timestamp TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_search_history_timestamp ON search_history(timestamp);
             """;
         cmd.ExecuteNonQuery();
 
@@ -246,6 +270,179 @@ public class GrigoriDbContext : IDisposable, IAsyncDisposable
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(content));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
+
+    #region Activity Log Methods
+
+    public async Task<long> InsertActivityLogAsync(
+        string activityType,
+        string description,
+        long durationMs,
+        string? details = null,
+        CancellationToken cancellationToken = default)
+    {
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO activity_log (activity_type, description, duration_ms, timestamp, details)
+            VALUES (@activityType, @description, @durationMs, @timestamp, @details);
+            SELECT last_insert_rowid();
+            """;
+
+        cmd.Parameters.AddWithValue("@activityType", activityType);
+        cmd.Parameters.AddWithValue("@description", description);
+        cmd.Parameters.AddWithValue("@durationMs", durationMs);
+        cmd.Parameters.AddWithValue("@timestamp", DateTime.UtcNow.ToString("O"));
+        cmd.Parameters.AddWithValue("@details", (object?)details ?? DBNull.Value);
+
+        var result = await cmd.ExecuteScalarAsync(cancellationToken);
+        return (long)result!;
+    }
+
+    public async Task<List<Models.ActivityLog>> GetRecentActivityLogsAsync(
+        int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        var logs = new List<Models.ActivityLog>();
+
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, activity_type, description, duration_ms, timestamp, details
+            FROM activity_log
+            ORDER BY timestamp DESC
+            LIMIT @limit
+            """;
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            logs.Add(new Models.ActivityLog
+            {
+                Id = reader.GetInt64(0),
+                ActivityType = reader.GetString(1),
+                Description = reader.GetString(2),
+                DurationMs = reader.GetInt64(3),
+                Timestamp = DateTime.Parse(reader.GetString(4)),
+                Details = reader.IsDBNull(5) ? null : reader.GetString(5)
+            });
+        }
+
+        return logs;
+    }
+
+    #endregion
+
+    #region Search History Methods
+
+    public async Task<long> InsertSearchHistoryAsync(
+        string query,
+        int resultCount,
+        long durationMs,
+        bool cacheHit,
+        bool usedHnsw,
+        CancellationToken cancellationToken = default)
+    {
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO search_history (query, result_count, duration_ms, cache_hit, used_hnsw, timestamp)
+            VALUES (@query, @resultCount, @durationMs, @cacheHit, @usedHnsw, @timestamp);
+            SELECT last_insert_rowid();
+            """;
+
+        cmd.Parameters.AddWithValue("@query", query);
+        cmd.Parameters.AddWithValue("@resultCount", resultCount);
+        cmd.Parameters.AddWithValue("@durationMs", durationMs);
+        cmd.Parameters.AddWithValue("@cacheHit", cacheHit ? 1 : 0);
+        cmd.Parameters.AddWithValue("@usedHnsw", usedHnsw ? 1 : 0);
+        cmd.Parameters.AddWithValue("@timestamp", DateTime.UtcNow.ToString("O"));
+
+        var result = await cmd.ExecuteScalarAsync(cancellationToken);
+        return (long)result!;
+    }
+
+    public async Task<List<Models.SearchHistory>> GetRecentSearchHistoryAsync(
+        int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        var history = new List<Models.SearchHistory>();
+
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, query, result_count, duration_ms, cache_hit, used_hnsw, timestamp
+            FROM search_history
+            ORDER BY timestamp DESC
+            LIMIT @limit
+            """;
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            history.Add(new Models.SearchHistory
+            {
+                Id = reader.GetInt64(0),
+                Query = reader.GetString(1),
+                ResultCount = reader.GetInt32(2),
+                DurationMs = reader.GetInt64(3),
+                CacheHit = reader.GetInt32(4) == 1,
+                UsedHnsw = reader.GetInt32(5) == 1,
+                Timestamp = DateTime.Parse(reader.GetString(6))
+            });
+        }
+
+        return history;
+    }
+
+    public async Task<List<(DateTime Hour, double AvgSearchTimeMs, double AvgIndexTimeMs)>> GetHourlyPerformanceMetricsAsync(
+        int hoursBack = 24,
+        CancellationToken cancellationToken = default)
+    {
+        var metrics = new List<(DateTime Hour, double AvgSearchTimeMs, double AvgIndexTimeMs)>();
+        var cutoff = DateTime.UtcNow.AddHours(-hoursBack).ToString("O");
+
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            WITH hours AS (
+                SELECT DISTINCT strftime('%Y-%m-%d %H:00:00', timestamp) as hour
+                FROM (
+                    SELECT timestamp FROM search_history WHERE timestamp >= @cutoff
+                    UNION ALL
+                    SELECT timestamp FROM activity_log WHERE timestamp >= @cutoff AND activity_type = 'indexing'
+                )
+            ),
+            search_stats AS (
+                SELECT strftime('%Y-%m-%d %H:00:00', timestamp) as hour, AVG(duration_ms) as avg_ms
+                FROM search_history
+                WHERE timestamp >= @cutoff
+                GROUP BY strftime('%Y-%m-%d %H:00:00', timestamp)
+            ),
+            index_stats AS (
+                SELECT strftime('%Y-%m-%d %H:00:00', timestamp) as hour, AVG(duration_ms) as avg_ms
+                FROM activity_log
+                WHERE timestamp >= @cutoff AND activity_type = 'indexing'
+                GROUP BY strftime('%Y-%m-%d %H:00:00', timestamp)
+            )
+            SELECT h.hour, COALESCE(s.avg_ms, 0) as avg_search_ms, COALESCE(i.avg_ms, 0) as avg_index_ms
+            FROM hours h
+            LEFT JOIN search_stats s ON h.hour = s.hour
+            LEFT JOIN index_stats i ON h.hour = i.hour
+            ORDER BY h.hour ASC
+            """;
+        cmd.Parameters.AddWithValue("@cutoff", cutoff);
+
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            metrics.Add((
+                DateTime.Parse(reader.GetString(0)),
+                reader.GetDouble(1),
+                reader.GetDouble(2)
+            ));
+        }
+
+        return metrics;
+    }
+
+    #endregion
 
     public void Dispose()
     {

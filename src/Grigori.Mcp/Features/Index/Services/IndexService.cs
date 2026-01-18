@@ -109,7 +109,7 @@ public class IndexService : IIndexService
             stopwatch.Stop();
             if (totalFilesIndexed > 0)
             {
-                _metricsService.RecordIndexing(stopwatch.ElapsedMilliseconds, totalFilesIndexed, totalChunksIndexed);
+                await _metricsService.RecordIndexingAsync(request.Path, stopwatch.ElapsedMilliseconds, totalFilesIndexed, totalChunksIndexed, cancellationToken);
             }
 
             return new IndexResultDto
@@ -148,7 +148,7 @@ public class IndexService : IIndexService
             }
 
             stopwatch.Stop();
-            _metricsService.RecordIndexing(stopwatch.ElapsedMilliseconds, 1, chunkCount.Value);
+            await _metricsService.RecordIndexingAsync(filePath, stopwatch.ElapsedMilliseconds, 1, chunkCount.Value, cancellationToken);
 
             return new IndexResultDto
             {
