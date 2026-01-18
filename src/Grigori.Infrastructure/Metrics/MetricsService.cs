@@ -1,11 +1,15 @@
 using Grigori.Contracts.Dtos.Metrics;
 using Grigori.Contracts.Interfaces;
+using Grigori.Database;
+using Microsoft.Extensions.Logging;
 
 namespace Grigori.Infrastructure.Metrics;
 
 public class MetricsService : IMetricsService
 {
     private readonly DateTime _serverStartTime;
+    private readonly GrigoriDbContext _dbContext;
+    private readonly ILogger<MetricsService> _logger;
 
     private long _totalSearches;
     private long _totalSearchTimeMs;
@@ -23,8 +27,10 @@ public class MetricsService : IMetricsService
     private long _totalEmbeddingsGenerated;
     private long _totalEmbeddingTimeMs;
 
-    public MetricsService()
+    public MetricsService(GrigoriDbContext dbContext, ILogger<MetricsService> logger)
     {
+        _dbContext = dbContext;
+        _logger = logger;
         _serverStartTime = DateTime.UtcNow;
     }
 
@@ -123,5 +129,46 @@ public class MetricsService : IMetricsService
 
         Interlocked.Exchange(ref _totalEmbeddingsGenerated, 0);
         Interlocked.Exchange(ref _totalEmbeddingTimeMs, 0);
+    }
+
+    public async Task RecordSearchAsync(string query, long durationMs, int resultCount, bool cacheHit, bool usedHnsw, CancellationToken cancellationToken = default)
+    {
+        // Record in-memory metrics first
+        RecordSearch(durationMs, resultCount, cacheHit, usedHnsw);
+
+        // Persist to database
+        try
+        {
+            await _dbContext.InsertSearchHistoryAsync(query, resultCount, durationMs, cacheHit, usedHnsw, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to persist search history for query: {Query}", query);
+        }
+    }
+
+    public async Task RecordIndexingAsync(string projectPath, long durationMs, int fileCount, int chunkCount, CancellationToken cancellationToken = default)
+    {
+        // Record in-memory metrics first
+        RecordIndexing(durationMs, fileCount, chunkCount);
+
+        // Persist to database
+        try
+        {
+            var projectName = Path.GetFileName(projectPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            var description = $"Indexed {fileCount} files ({chunkCount} chunks) from {projectName}";
+            var details = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                ProjectPath = projectPath,
+                FileCount = fileCount,
+                ChunkCount = chunkCount
+            });
+
+            await _dbContext.InsertActivityLogAsync("indexing", description, durationMs, details, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to persist indexing activity for path: {Path}", projectPath);
+        }
     }
 }

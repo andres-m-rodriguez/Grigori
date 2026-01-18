@@ -97,7 +97,7 @@ public class SearchService : ISearchService
                 .ToList();
 
             stopwatch.Stop();
-            _metricsService.RecordSearch(stopwatch.ElapsedMilliseconds, finalResults.Count, cacheHit, false);
+            await _metricsService.RecordSearchAsync(request.Query, stopwatch.ElapsedMilliseconds, finalResults.Count, cacheHit, false, cancellationToken);
 
             // Format results based on output mode
             var formattedResults = FormatResults(finalResults, request.OutputMode);
