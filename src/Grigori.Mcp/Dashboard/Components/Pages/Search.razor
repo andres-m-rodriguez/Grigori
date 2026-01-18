@@ -103,7 +103,7 @@
         <MudStack Spacing="3">
             @foreach (var result in _filteredResults)
             {
-                <MudCard Elevation="2">
+                <MudCard Elevation="2" @key="@($"{result.FilePath}:{result.StartLine}")">
                     <MudCardHeader Class="pb-0">
                         <CardHeaderAvatar>
                             <MudAvatar Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
