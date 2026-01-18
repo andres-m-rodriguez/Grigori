@@ -173,6 +173,33 @@ public class GrigoriDbContext : IDisposable, IAsyncDisposable
         return chunks;
     }
 
+    public async Task<List<CodeChunk>> GetChunksByIdsAsync(IReadOnlyList<long> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var chunks = new List<CodeChunk>();
+
+        await using var cmd = _connection.CreateCommand();
+        var idParams = string.Join(",", ids.Select((_, i) => $"@id{i}"));
+        cmd.CommandText = $"SELECT id, file_path, start_line, end_line, content, content_hash, embedding, features, indexed_at FROM chunks WHERE id IN ({idParams})";
+
+        for (var i = 0; i < ids.Count; i++)
+        {
+            cmd.Parameters.AddWithValue($"@id{i}", ids[i]);
+        }
+
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            chunks.Add(ReadChunk(reader));
+        }
+
+        return chunks;
+    }
+
     public async Task<List<CodeChunk>> SearchChunksAsync(
         List<string>? fileExtensions = null,
         List<string>? requiredFeatures = null,
