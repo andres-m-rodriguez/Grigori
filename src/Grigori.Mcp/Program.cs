@@ -125,9 +125,10 @@ app.UseCors();
 
 if (serverMode || mcpHttpMode)
 {
-    // Map MCP endpoints for Streamable HTTP transport
-    // This exposes /sse and /message endpoints for MCP clients
-    app.MapMcp();
+    // Map MCP endpoints for Streamable HTTP transport with /mcp prefix
+    // This exposes /mcp, /mcp/sse and /mcp/message endpoints for MCP clients
+    // Using a prefix avoids route conflict with Blazor's "/" route
+    app.MapMcp("/mcp");
 }
 
 // ============================================================================
@@ -249,8 +250,9 @@ else if (mcpHttpMode)
 {
     // MCP HTTP mode - runs MCP server over HTTP + REST API + Dashboard
     Console.WriteLine($"Grigori MCP Server started (HTTP transport)");
-    Console.WriteLine($"  MCP SSE:   {baseUrl}/sse");
-    Console.WriteLine($"  MCP Msg:   {baseUrl}/message");
+    Console.WriteLine($"  MCP:       {baseUrl}/mcp");
+    Console.WriteLine($"  MCP SSE:   {baseUrl}/mcp/sse");
+    Console.WriteLine($"  MCP Msg:   {baseUrl}/mcp/message");
     Console.WriteLine($"  Dashboard: {baseUrl}");
     Console.WriteLine($"  API:       {baseUrl}/api");
     Console.WriteLine($"  Health:    {baseUrl}/api/health");
@@ -263,8 +265,9 @@ else
     Console.WriteLine($"  Dashboard: {baseUrl}");
     Console.WriteLine($"  API:       {baseUrl}/api");
     Console.WriteLine($"  Health:    {baseUrl}/api/health");
-    Console.WriteLine($"  MCP SSE:   {baseUrl}/sse");
-    Console.WriteLine($"  MCP Msg:   {baseUrl}/message");
+    Console.WriteLine($"  MCP:       {baseUrl}/mcp");
+    Console.WriteLine($"  MCP SSE:   {baseUrl}/mcp/sse");
+    Console.WriteLine($"  MCP Msg:   {baseUrl}/mcp/message");
     await app.WaitForShutdownAsync();
 }
 
