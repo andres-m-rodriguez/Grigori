@@ -1,0 +1,72 @@
+@using Grigori.Contracts.Interfaces
+@implements IDisposable
+@inject IDependencyTracker Tracker
+
+@if (_dependencies.Count > 0)
+{
+    <MudPaper Elevation="0" Class="pa-3 mb-2" Style="background: var(--mud-palette-background-grey);">
+        <MudText Typo="Typo.overline" Class="mb-2">Dependencies</MudText>
+
+        @foreach (var dep in _dependencies)
+        {
+            <div class="d-flex align-center mb-2">
+                @switch (dep.State)
+                {
+                    case DependencyState.Ready:
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" Class="mr-2" />
+                        break;
+                    case DependencyState.Failed:
+                        <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small" Class="mr-2" />
+                        break;
+                    case DependencyState.Downloading:
+                    case DependencyState.Loading:
+                    case DependencyState.Checking:
+                        <MudProgressCircular Size="Size.Small" Indeterminate="@(dep.Progress == null)" Value="@(dep.Progress ?? 0)" Class="mr-2" Style="width: 20px; height: 20px;" />
+                        break;
+                    default:
+                        <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" Color="Color.Default" Size="Size.Small" Class="mr-2" />
+                        break;
+                }
+
+                <div class="flex-grow-1">
+                    <MudText Typo="Typo.body2">@dep.Name</MudText>
+                    @if (!string.IsNullOrEmpty(dep.Message) && dep.State != DependencyState.Ready)
+                    {
+                        <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
+                            @dep.Message
+                        </MudText>
+                    }
+                </div>
+            </div>
+
+            @if (dep.State == DependencyState.Downloading && dep.Progress.HasValue)
+            {
+                <MudProgressLinear Value="@dep.Progress.Value" Class="mb-2" Color="Color.Primary" />
+            }
+        }
+    </MudPaper>
+}
+
+@code {
+    private List<DependencyStatus> _dependencies = [];
+
+    protected override void OnInitialized()
+    {
+        _dependencies = Tracker.Dependencies.ToList();
+        Tracker.OnStatusChanged += OnStatusChanged;
+    }
+
+    private void OnStatusChanged(DependencyStatus status)
+    {
+        InvokeAsync(() =>
+        {
+            _dependencies = Tracker.Dependencies.ToList();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        Tracker.OnStatusChanged -= OnStatusChanged;
+    }
+}
