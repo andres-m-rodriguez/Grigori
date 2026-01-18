@@ -2,21 +2,49 @@
 
 <PageTitle>Search - Grigori</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Semantic Search</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">Code Search</MudText>
 
 @* Search Input *@
 <MudPaper Elevation="1" Class="pa-4 mb-4">
-    <MudTextField T="string"
-                  Value="_query"
-                  ValueChanged="OnQueryChanged"
-                  Placeholder="Search code semantically... (e.g., 'function that handles user authentication')"
-                  Variant="Variant.Outlined"
-                  Adornment="Adornment.Start"
-                  AdornmentIcon="@Icons.Material.Filled.Search"
-                  Immediate="true"
-                  OnKeyDown="HandleKeyDown"
-                  FullWidth="true"
-                  Clearable="true" />
+    <MudStack Spacing="3">
+        <MudTextField T="string"
+                      Value="_query"
+                      ValueChanged="OnQueryChanged"
+                      Placeholder="@GetSearchPlaceholder()"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true"
+                      OnKeyDown="HandleKeyDown"
+                      FullWidth="true"
+                      Clearable="true" />
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">Search Mode:</MudText>
+            <MudToggleGroup T="string" Value="_searchMode" ValueChanged="OnSearchModeChanged" Size="Size.Small" Color="Color.Primary">
+                <MudToggleItem Value="@("hybrid")">
+                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" />
+                        <MudText Typo="Typo.body2">Hybrid</MudText>
+                    </MudStack>
+                </MudToggleItem>
+                <MudToggleItem Value="@("semantic")">
+                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" />
+                        <MudText Typo="Typo.body2">Semantic</MudText>
+                    </MudStack>
+                </MudToggleItem>
+                <MudToggleItem Value="@("lexical")">
+                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.TextFields" Size="Size.Small" />
+                        <MudText Typo="Typo.body2">Lexical</MudText>
+                    </MudStack>
+                </MudToggleItem>
+            </MudToggleGroup>
+            <MudTooltip Text="@GetSearchModeTooltip()">
+                <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Style="color: var(--mud-palette-text-secondary); cursor: help;" />
+            </MudTooltip>
+        </MudStack>
+    </MudStack>
 </MudPaper>
 
 @* Filters *@
@@ -72,6 +100,9 @@
 
             <MudSpacer />
 
+            <MudChip T="string" Icon="@GetSearchModeIcon()" Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary">
+                @_searchMode
+            </MudChip>
             <MudChip T="string" Icon="@Icons.Material.Filled.Timer" Size="Size.Small" Variant="Variant.Text">
                 @_searchDuration.TotalMilliseconds.ToString("F0")ms
             </MudChip>
