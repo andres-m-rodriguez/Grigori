@@ -1,6 +1,7 @@
 using Grigori.Contracts.Interfaces;
 using Grigori.Database;
 using Grigori.Infrastructure.Indexing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Grigori.Mcp.Dashboard.Services;
 
@@ -8,16 +9,21 @@ public class DashboardService
 {
     private readonly GrigoriDbContext _dbContext;
     private readonly HnswIndex _hnswIndex;
-    private readonly IEmbeddingProvider _embeddingProvider;
+    private readonly IServiceProvider _serviceProvider;
+
+    // Lazy-load embedding provider to avoid blocking page render
+    private IEmbeddingProvider? _embeddingProvider;
+    private IEmbeddingProvider EmbeddingProvider =>
+        _embeddingProvider ??= _serviceProvider.GetRequiredService<IEmbeddingProvider>();
 
     public DashboardService(
         GrigoriDbContext dbContext,
         HnswIndex hnswIndex,
-        IEmbeddingProvider embeddingProvider)
+        IServiceProvider serviceProvider)
     {
         _dbContext = dbContext;
         _hnswIndex = hnswIndex;
-        _embeddingProvider = embeddingProvider;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task<IndexStats> GetIndexStatsAsync()
@@ -116,8 +122,8 @@ public class DashboardService
         if (string.IsNullOrWhiteSpace(query))
             return [];
 
-        // Generate embedding for query
-        var embeddingResult = await _embeddingProvider.GetEmbeddingAsync(
+        // Generate embedding for query (lazy-loads embedding provider on first search)
+        var embeddingResult = await EmbeddingProvider.GetEmbeddingAsync(
             query,
             EmbeddingInputType.Query);
 

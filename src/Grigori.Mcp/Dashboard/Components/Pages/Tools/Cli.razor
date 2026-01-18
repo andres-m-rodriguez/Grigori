@@ -1,0 +1,169 @@
+@page "/tools/cli"
+
+<PageTitle>CLI - Grigori</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Command Line Interface</MudText>
+<MudText Typo="Typo.body1" Class="mb-6" Style="color: var(--mud-palette-text-secondary);">
+    Index your projects to Grigori from the command line
+</MudText>
+
+<MudGrid Spacing="4">
+    <MudItem xs="12" md="8">
+        <MudPaper Elevation="1" Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Download" Class="mr-2" />
+                Installation
+            </MudText>
+
+            <MudText Typo="Typo.body2" Class="mb-2">
+                Install the Grigori CLI as a .NET global tool:
+            </MudText>
+
+            <MudPaper Elevation="0" Class="pa-3 mb-3" Style="background: var(--mud-palette-background); font-family: monospace;">
+                <code>dotnet tool install --global Grigori.Cli</code>
+            </MudPaper>
+
+            <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+                Requires .NET 10.0 SDK or later
+            </MudText>
+        </MudPaper>
+
+        <MudPaper Elevation="1" Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Class="mr-2" />
+                Usage
+            </MudText>
+
+            <MudPaper Elevation="0" Class="pa-3 mb-3" Style="background: var(--mud-palette-background); font-family: monospace; white-space: pre-wrap;">grigori index [path] [options]</MudPaper>
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2 mt-4">Arguments</MudText>
+            <MudSimpleTable Dense="true" Hover="true" Class="mb-4">
+                <thead>
+                    <tr>
+                        <th>Argument</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>path</code></td>
+                        <td>Path to the project directory (default: current directory)</td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Options</MudText>
+            <MudSimpleTable Dense="true" Hover="true">
+                <thead>
+                    <tr>
+                        <th>Option</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>-s, --server &lt;url&gt;</code></td>
+                        <td>Grigori server URL (default: http://localhost:5151)</td>
+                    </tr>
+                    <tr>
+                        <td><code>-h, --help</code></td>
+                        <td>Show help information</td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+
+        <MudPaper Elevation="1" Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Code" Class="mr-2" />
+                Examples
+            </MudText>
+
+            <MudText Typo="Typo.body2" Class="mb-2">Index the current directory:</MudText>
+            <MudPaper Elevation="0" Class="pa-3 mb-4" Style="background: var(--mud-palette-background); font-family: monospace;">
+                <code>grigori index</code>
+            </MudPaper>
+
+            <MudText Typo="Typo.body2" Class="mb-2">Index a specific project:</MudText>
+            <MudPaper Elevation="0" Class="pa-3 mb-4" Style="background: var(--mud-palette-background); font-family: monospace;">
+                <code>grigori index ./my-project</code>
+            </MudPaper>
+
+            <MudText Typo="Typo.body2" Class="mb-2">Index to a remote server:</MudText>
+            <MudPaper Elevation="0" Class="pa-3 mb-4" Style="background: var(--mud-palette-background); font-family: monospace;">
+                <code>grigori index . -s http://grigori-server:5151</code>
+            </MudPaper>
+
+            <MudText Typo="Typo.body2" Class="mb-2">Index from Docker container:</MudText>
+            <MudPaper Elevation="0" Class="pa-3" Style="background: var(--mud-palette-background); font-family: monospace;">
+                <code>grigori index /mounted/project -s http://host.docker.internal:5151</code>
+            </MudPaper>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="4">
+        <MudPaper Elevation="1" Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+                Quick Start
+            </MudText>
+
+            <MudTimeline TimelinePosition="TimelinePosition.Start">
+                <MudTimelineItem Color="Color.Primary" Size="Size.Small">
+                    <MudText Typo="Typo.body2">Start Grigori server</MudText>
+                    <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
+                        docker run -d -p 5151:5151 grigori
+                    </MudText>
+                </MudTimelineItem>
+                <MudTimelineItem Color="Color.Primary" Size="Size.Small">
+                    <MudText Typo="Typo.body2">Install CLI</MudText>
+                    <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
+                        dotnet tool install -g Grigori.Cli
+                    </MudText>
+                </MudTimelineItem>
+                <MudTimelineItem Color="Color.Primary" Size="Size.Small">
+                    <MudText Typo="Typo.body2">Index your project</MudText>
+                    <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
+                        cd my-project && grigori index
+                    </MudText>
+                </MudTimelineItem>
+                <MudTimelineItem Color="Color.Success" Size="Size.Small">
+                    <MudText Typo="Typo.body2">Search!</MudText>
+                    <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
+                        Use the dashboard or MCP
+                    </MudText>
+                </MudTimelineItem>
+            </MudTimeline>
+        </MudPaper>
+
+        <MudPaper Elevation="1" Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Class="mr-2" />
+                Supported Files
+            </MudText>
+
+            <MudText Typo="Typo.body2" Class="mb-3" Style="color: var(--mud-palette-text-secondary);">
+                The CLI automatically indexes common code files:
+            </MudText>
+
+            <MudChipSet T="string" ReadOnly="true">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">.cs</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">.ts</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">.js</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">.py</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">.go</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">.rs</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">.java</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">.cpp</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">.c</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">.razor</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">.vue</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">.svelte</MudChip>
+            </MudChipSet>
+
+            <MudText Typo="Typo.caption" Class="mt-3" Style="color: var(--mud-palette-text-secondary);">
+                Excludes: node_modules, bin, obj, .git, etc.
+            </MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>

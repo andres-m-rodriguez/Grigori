@@ -26,6 +26,9 @@
 
     <!-- Trim settings - disabled due to ONNX Runtime reflection usage -->
     <PublishTrimmed>false</PublishTrimmed>
+
+    <!-- Static web assets for Blazor -->
+    <StaticWebAssetsSelfContained>true</StaticWebAssetsSelfContained>
   </PropertyGroup>
 
   <ItemGroup>
