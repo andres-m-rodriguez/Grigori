@@ -249,6 +249,54 @@ public class GrigoriDbContext : IDisposable, IAsyncDisposable
         return Convert.ToInt32(result);
     }
 
+    /// <summary>
+    /// Gets chunks for lexical search (without embeddings for efficiency).
+    /// </summary>
+    public async Task<List<(long Id, string FilePath, int StartLine, int EndLine, string Content, string? Features)>> GetChunksForLexicalSearchAsync(
+        List<string>? fileExtensions = null,
+        CancellationToken cancellationToken = default)
+    {
+        var chunks = new List<(long Id, string FilePath, int StartLine, int EndLine, string Content, string? Features)>();
+
+        var sql = new StringBuilder("SELECT id, file_path, start_line, end_line, content, features FROM chunks WHERE 1=1");
+        var parameters = new List<SqliteParameter>();
+
+        if (fileExtensions is { Count: > 0 })
+        {
+            var extensionConditions = fileExtensions
+                .Select((ext, i) => $"file_path LIKE @ext{i}")
+                .ToList();
+            sql.Append($" AND ({string.Join(" OR ", extensionConditions)})");
+
+            for (var i = 0; i < fileExtensions.Count; i++)
+            {
+                parameters.Add(new SqliteParameter($"@ext{i}", $"%{fileExtensions[i]}"));
+            }
+        }
+
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = sql.ToString();
+        foreach (var param in parameters)
+        {
+            cmd.Parameters.Add(param);
+        }
+
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            chunks.Add((
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.GetInt32(2),
+                reader.GetInt32(3),
+                reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5)
+            ));
+        }
+
+        return chunks;
+    }
+
     private static CodeChunk ReadChunk(SqliteDataReader reader)
     {
         return new CodeChunk

@@ -18,8 +18,13 @@ public class SearchService : ISearchService
 
     private const float DefaultScoreThreshold = 0.3f;
     private const float FeatureBoostFactor = 0.05f;
+    private const double SemanticWeight = 1.0;
+    private const double LexicalWeight = 0.8;  // Slightly favor semantic results
     private static readonly TimeSpan QueryCacheTtl = TimeSpan.FromMinutes(30);
     private readonly ConcurrentDictionary<string, (float[] Embedding, DateTime CachedAt)> _queryEmbeddingCache = new();
+    private Bm25Scorer? _bm25Scorer;
+    private DateTime _bm25ScorerLastUpdate = DateTime.MinValue;
+    private static readonly TimeSpan Bm25ScorerRefreshInterval = TimeSpan.FromMinutes(5);
 
     public SearchService(
         IChunkRepository chunkRepository,
@@ -42,21 +47,17 @@ public class SearchService : ISearchService
             return GrigoriError.InvalidQuery("Query cannot be empty");
         }
 
+        var searchMode = (request.SearchMode ?? "hybrid").ToLowerInvariant();
+        if (searchMode != "semantic" && searchMode != "lexical" && searchMode != "hybrid")
+        {
+            return GrigoriError.InvalidQuery($"Invalid search mode '{request.SearchMode}'. Valid options: semantic, lexical, hybrid");
+        }
+
         var stopwatch = Stopwatch.StartNew();
 
         try
         {
             var cacheHit = IsQueryCached(request.Query);
-
-            // Get query embedding
-            var embeddingResult = await GetQueryEmbeddingAsync(request.Query, cancellationToken);
-            if (embeddingResult.IsFailure)
-            {
-                return embeddingResult.Error;
-            }
-
-            var queryEmbedding = embeddingResult.Value;
-            var queryFeatures = FeatureExtractor.ExtractFeaturesFromQuery(request.Query);
 
             // Parse file extensions
             List<string>? fileExtensions = null;
@@ -68,33 +69,32 @@ public class SearchService : ISearchService
                     .ToList();
             }
 
-            // Search repository
-            var searchResult = await _chunkRepository.SearchAsync(
-                queryEmbedding,
-                request.Limit * 2,
-                DefaultScoreThreshold,
-                requiredFeatures: null,
-                fileExtensions: fileExtensions,
-                cancellationToken);
+            List<SearchResultItem> finalResults;
 
-            if (searchResult.IsFailure)
+            if (searchMode == "lexical")
             {
-                return searchResult.Error;
+                // Pure lexical search
+                var lexicalResult = await PerformLexicalSearchAsync(request.Query, request.Limit, fileExtensions, cancellationToken);
+                if (lexicalResult.IsFailure)
+                    return lexicalResult.Error;
+                finalResults = lexicalResult.Value;
             }
-
-            var results = searchResult.Value;
-
-            // Apply feature boosting
-            if (queryFeatures.Count > 0)
+            else if (searchMode == "semantic")
             {
-                results = results.Select(r => ApplyFeatureBoost(r, queryFeatures)).ToList();
+                // Pure semantic search
+                var semanticResult = await PerformSemanticSearchAsync(request.Query, request.Limit, fileExtensions, cancellationToken);
+                if (semanticResult.IsFailure)
+                    return semanticResult.Error;
+                finalResults = semanticResult.Value;
             }
-
-            // Re-sort and take limit
-            var finalResults = results
-                .OrderByDescending(r => r.Score)
-                .Take(request.Limit)
-                .ToList();
+            else
+            {
+                // Hybrid search with RRF fusion
+                var hybridResult = await PerformHybridSearchAsync(request.Query, request.Limit, fileExtensions, cancellationToken);
+                if (hybridResult.IsFailure)
+                    return hybridResult.Error;
+                finalResults = hybridResult.Value;
+            }
 
             stopwatch.Stop();
             await _metricsService.RecordSearchAsync(request.Query, stopwatch.ElapsedMilliseconds, finalResults.Count, cacheHit, false, cancellationToken);
@@ -110,6 +110,7 @@ public class SearchService : ISearchService
                     durationMs = stopwatch.ElapsedMilliseconds,
                     cacheHit,
                     outputMode = request.OutputMode,
+                    searchMode,
                     tokenEstimate = 0
                 },
                 results = formattedResults
@@ -134,7 +135,8 @@ public class SearchService : ISearchService
                     DurationMs = stopwatch.ElapsedMilliseconds,
                     CacheHit = cacheHit,
                     OutputMode = request.OutputMode,
-                    TokenEstimate = tokenEstimate
+                    TokenEstimate = tokenEstimate,
+                    SearchMode = searchMode
                 }
             };
         }
@@ -143,6 +145,174 @@ public class SearchService : ISearchService
             _logger.LogError(ex, "Search failed for query: {Query}", request.Query);
             return GrigoriError.SearchFailed(request.Query, ex.Message, ex);
         }
+    }
+
+    private async Task<Result<List<SearchResultItem>, GrigoriError>> PerformSemanticSearchAsync(
+        string query,
+        int limit,
+        List<string>? fileExtensions,
+        CancellationToken cancellationToken)
+    {
+        // Get query embedding
+        var embeddingResult = await GetQueryEmbeddingAsync(query, cancellationToken);
+        if (embeddingResult.IsFailure)
+            return embeddingResult.Error;
+
+        var queryEmbedding = embeddingResult.Value;
+        var queryFeatures = FeatureExtractor.ExtractFeaturesFromQuery(query);
+
+        // Search repository with semantic matching
+        var searchResult = await _chunkRepository.SearchAsync(
+            queryEmbedding,
+            limit * 2,
+            DefaultScoreThreshold,
+            requiredFeatures: null,
+            fileExtensions: fileExtensions,
+            cancellationToken);
+
+        if (searchResult.IsFailure)
+            return searchResult.Error;
+
+        var results = searchResult.Value;
+
+        // Apply feature boosting
+        if (queryFeatures.Count > 0)
+        {
+            results = results.Select(r => ApplyFeatureBoost(r, queryFeatures)).ToList();
+        }
+
+        // Re-sort and take limit
+        return results
+            .OrderByDescending(r => r.Score)
+            .Take(limit)
+            .ToList();
+    }
+
+    private async Task<Result<List<SearchResultItem>, GrigoriError>> PerformLexicalSearchAsync(
+        string query,
+        int limit,
+        List<string>? fileExtensions,
+        CancellationToken cancellationToken)
+    {
+        // Get chunks for lexical search
+        var chunksResult = await _chunkRepository.GetChunksForLexicalSearchAsync(fileExtensions, cancellationToken);
+        if (chunksResult.IsFailure)
+            return chunksResult.Error;
+
+        var chunks = chunksResult.Value;
+        if (chunks.Count == 0)
+            return new List<SearchResultItem>();
+
+        // Initialize or refresh BM25 scorer
+        await RefreshBm25ScorerIfNeededAsync(chunks, cancellationToken);
+
+        // Score chunks with BM25
+        var scoredChunks = _bm25Scorer!
+            .ScoreDocuments(query, chunks.Select(c => (c.Id, c.Content)))
+            .Take(limit)
+            .ToList();
+
+        // Normalize scores to 0-1 range
+        var normalizedScores = Bm25Scorer.NormalizeScores(scoredChunks).ToDictionary(x => x.Id, x => x.Score);
+
+        // Build result items
+        var chunkLookup = chunks.ToDictionary(c => c.Id);
+        var results = scoredChunks
+            .Where(s => chunkLookup.ContainsKey(s.Id))
+            .Select(s =>
+            {
+                var chunk = chunkLookup[s.Id];
+                return new SearchResultItem
+                {
+                    Id = chunk.Id,
+                    FilePath = chunk.FilePath,
+                    StartLine = chunk.StartLine,
+                    EndLine = chunk.EndLine,
+                    Content = chunk.Content,
+                    Score = (float)normalizedScores.GetValueOrDefault(s.Id, 0),
+                    Features = chunk.Features
+                };
+            })
+            .ToList();
+
+        return results;
+    }
+
+    private async Task<Result<List<SearchResultItem>, GrigoriError>> PerformHybridSearchAsync(
+        string query,
+        int limit,
+        List<string>? fileExtensions,
+        CancellationToken cancellationToken)
+    {
+        // Run semantic and lexical searches
+        var semanticTask = PerformSemanticSearchAsync(query, limit * 2, fileExtensions, cancellationToken);
+        var lexicalTask = PerformLexicalSearchAsync(query, limit * 2, fileExtensions, cancellationToken);
+
+        await Task.WhenAll(semanticTask, lexicalTask);
+
+        var semanticResult = await semanticTask;
+        var lexicalResult = await lexicalTask;
+
+        if (semanticResult.IsFailure && lexicalResult.IsFailure)
+            return semanticResult.Error;
+
+        var semanticResults = semanticResult.IsSuccess ? semanticResult.Value : [];
+        var lexicalResults = lexicalResult.IsSuccess ? lexicalResult.Value : [];
+
+        _logger.LogDebug(
+            "Hybrid search: {SemanticCount} semantic results, {LexicalCount} lexical results",
+            semanticResults.Count,
+            lexicalResults.Count);
+
+        // If only one search type returned results, use that
+        if (semanticResults.Count == 0 && lexicalResults.Count > 0)
+            return lexicalResults.Take(limit).ToList();
+        if (lexicalResults.Count == 0 && semanticResults.Count > 0)
+            return semanticResults.Take(limit).ToList();
+        if (semanticResults.Count == 0 && lexicalResults.Count == 0)
+            return new List<SearchResultItem>();
+
+        // Fuse results using RRF
+        var fusedResults = ReciprocalRankFusion.FuseWithScores(
+            semanticResults.Select(r => (r.Id, r.Score)),
+            lexicalResults.Select(r => (r.Id, (double)r.Score)),
+            SemanticWeight,
+            LexicalWeight);
+
+        // Build lookup for chunk data
+        var allChunks = semanticResults
+            .Concat(lexicalResults)
+            .DistinctBy(r => r.Id)
+            .ToDictionary(r => r.Id);
+
+        // Map fused scores back to SearchResultItems
+        var finalResults = fusedResults
+            .Where(f => allChunks.ContainsKey(f.Id))
+            .Take(limit)
+            .Select(f =>
+            {
+                var chunk = allChunks[f.Id];
+                // Use the higher of the two original scores, or a combination
+                var combinedScore = f.InBothLists
+                    ? Math.Max(f.SemanticScore, (float)f.LexicalScore) * 1.1f  // Bonus for appearing in both
+                    : Math.Max(f.SemanticScore, (float)f.LexicalScore);
+                return chunk with { Score = Math.Min(1.0f, combinedScore) };
+            })
+            .ToList();
+
+        return finalResults;
+    }
+
+    private Task RefreshBm25ScorerIfNeededAsync(List<ChunkForLexicalSearch> chunks, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        if (_bm25Scorer == null || (now - _bm25ScorerLastUpdate) > Bm25ScorerRefreshInterval)
+        {
+            _logger.LogDebug("Refreshing BM25 scorer with {Count} documents", chunks.Count);
+            _bm25Scorer = new Bm25Scorer(chunks.Select(c => c.Content));
+            _bm25ScorerLastUpdate = now;
+        }
+        return Task.CompletedTask;
     }
 
     public bool IsQueryCached(string query)

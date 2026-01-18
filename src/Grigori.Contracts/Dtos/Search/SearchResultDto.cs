@@ -14,4 +14,5 @@ public record SearchMetricsDto
     public required bool CacheHit { get; init; }
     public required string OutputMode { get; init; }
     public required int TokenEstimate { get; init; }
+    public string SearchMode { get; init; } = "hybrid";
 }
