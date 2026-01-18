@@ -6,5 +6,6 @@
     <Project Path="src/Grigori.Infrastructure/Grigori.Infrastructure.csproj" />
     <Project Path="src/Grigori.Mcp/Grigori.Mcp.csproj" />
     <Project Path="src/Grigori.Api/Grigori.Api.csproj" />
+    <Project Path="src/Grigori.Cli/Grigori.Cli.csproj" />
   </Folder>
 </Solution>
