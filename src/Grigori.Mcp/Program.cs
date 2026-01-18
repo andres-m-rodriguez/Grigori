@@ -180,8 +180,11 @@ app.MapPost("/api/index/files", async Task<IResult> (IndexFilesRequest request, 
     if (request.Files is null || request.Files.Count == 0)
         return Results.BadRequest(new { error = "Files are required" });
 
-    // Create temp directory for files
-    var tempDir = Path.Combine(Path.GetTempPath(), "grigori-index", Guid.NewGuid().ToString());
+    // Create temp directory for files using project name if provided
+    var projectFolder = !string.IsNullOrEmpty(request.ProjectName)
+        ? request.ProjectName
+        : Guid.NewGuid().ToString();
+    var tempDir = Path.Combine(Path.GetTempPath(), "grigori-index", projectFolder);
     Directory.CreateDirectory(tempDir);
 
     try
@@ -196,10 +199,11 @@ app.MapPost("/api/index/files", async Task<IResult> (IndexFilesRequest request, 
             await File.WriteAllTextAsync(filePath, file.Content, ct);
         }
 
-        // Index the temp directory
+        // Index the temp directory, passing project name so paths are stored correctly
         var result = await indexService.IndexDirectoryAsync(new IndexRequestDto
         {
-            Path = tempDir
+            Path = tempDir,
+            ProjectName = request.ProjectName
         }, ct);
 
         return result.Match(
@@ -268,5 +272,5 @@ else
 
 record SearchRequest(string Query, int? Limit, string? FileTypes, string? OutputMode);
 record IndexRequest(string Path);
-record IndexFilesRequest(List<FileContent> Files);
+record IndexFilesRequest(string? ProjectName, List<FileContent> Files);
 record FileContent(string RelativePath, string Content);
