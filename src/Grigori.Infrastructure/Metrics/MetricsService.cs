@@ -6,6 +6,9 @@ namespace Grigori.Infrastructure.Metrics;
 public class MetricsService : IMetricsService
 {
     private readonly DateTime _serverStartTime;
+    private readonly object _activityLock = new();
+    private readonly LinkedList<ActivityEvent> _recentActivity = new();
+    private const int MaxActivityEvents = 1000;
 
     private long _totalSearches;
     private long _totalSearchTimeMs;
@@ -57,6 +60,25 @@ public class MetricsService : IMetricsService
     {
         Interlocked.Add(ref _totalEmbeddingsGenerated, count);
         Interlocked.Add(ref _totalEmbeddingTimeMs, durationMs);
+    }
+
+    public void RecordFileActivity(string filePath, string projectName, int chunksCreated)
+    {
+        var activity = new ActivityEvent(DateTime.UtcNow, filePath, projectName, chunksCreated);
+        lock (_activityLock)
+        {
+            _recentActivity.AddFirst(activity);
+            while (_recentActivity.Count > MaxActivityEvents)
+                _recentActivity.RemoveLast();
+        }
+    }
+
+    public List<ActivityEvent> GetRecentActivity(int count = 50)
+    {
+        lock (_activityLock)
+        {
+            return _recentActivity.Take(count).ToList();
+        }
     }
 
     public MetricsSnapshotDto GetSnapshot()
@@ -123,5 +145,10 @@ public class MetricsService : IMetricsService
 
         Interlocked.Exchange(ref _totalEmbeddingsGenerated, 0);
         Interlocked.Exchange(ref _totalEmbeddingTimeMs, 0);
+
+        lock (_activityLock)
+        {
+            _recentActivity.Clear();
+        }
     }
 }

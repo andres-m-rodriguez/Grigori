@@ -85,30 +85,30 @@ builder.Services.AddCors(options =>
     });
 });
 
-if (mcpMode || mcpHttpMode)
+// Register MCP tool endpoints (available in all modes except dashboard-only)
+if (!dashboardOnly)
 {
-    // Register MCP tool endpoints
     builder.Services.AddScoped<SearchEndpoints>();
     builder.Services.AddScoped<IndexEndpoints>();
     builder.Services.AddScoped<MetricsEndpoints>();
     builder.Services.AddScoped<BenchmarkEndpoints>();
+}
 
-    if (mcpMode)
-    {
-        // Register MCP server with stdio transport (local use)
-        builder.Services
-            .AddMcpServer()
-            .WithStdioServerTransport()
-            .WithToolsFromAssembly();
-    }
-    else if (mcpHttpMode)
-    {
-        // Register MCP server with HTTP transport (remote AI clients)
-        builder.Services
-            .AddMcpServer()
-            .WithHttpTransport()
-            .WithToolsFromAssembly();
-    }
+if (mcpMode)
+{
+    // Register MCP server with stdio transport (local use)
+    builder.Services
+        .AddMcpServer()
+        .WithStdioServerTransport()
+        .WithToolsFromAssembly();
+}
+else if (serverMode || mcpHttpMode)
+{
+    // Register MCP server with HTTP transport (server mode includes MCP)
+    builder.Services
+        .AddMcpServer()
+        .WithHttpTransport()
+        .WithToolsFromAssembly();
 }
 
 var app = builder.Build();
@@ -123,10 +123,10 @@ app.UseCors();
 // MCP HTTP Endpoints (for remote AI clients)
 // ============================================================================
 
-if (mcpHttpMode)
+if (serverMode || mcpHttpMode)
 {
     // Map MCP endpoints for Streamable HTTP transport
-    // This exposes /mcp endpoint that accepts JSON-RPC over HTTP
+    // This exposes /sse and /message endpoints for MCP clients
     app.MapMcp();
 }
 
@@ -258,11 +258,13 @@ else if (mcpHttpMode)
 }
 else
 {
-    // Server mode - HTTP API + Dashboard (no MCP)
+    // Server mode - HTTP API + Dashboard + MCP
     Console.WriteLine($"Grigori Server started");
     Console.WriteLine($"  Dashboard: {baseUrl}");
     Console.WriteLine($"  API:       {baseUrl}/api");
     Console.WriteLine($"  Health:    {baseUrl}/api/health");
+    Console.WriteLine($"  MCP SSE:   {baseUrl}/sse");
+    Console.WriteLine($"  MCP Msg:   {baseUrl}/message");
     await app.WaitForShutdownAsync();
 }
 
