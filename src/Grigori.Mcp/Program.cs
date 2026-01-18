@@ -16,6 +16,7 @@ using Grigori.Mcp.Features.Metrics.Endpoints;
 using Grigori.Mcp.Features.Search.Endpoints;
 using Grigori.Mcp.Features.Search.Services;
 using ModelContextProtocol.Server;
+using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +56,9 @@ builder.Services.AddScoped<DashboardService>();
 // Add Blazor services
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Add MudBlazor
+builder.Services.AddMudServices();
 
 // Add CORS for API access
 builder.Services.AddCors(options =>
