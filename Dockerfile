@@ -25,22 +25,18 @@ COPY src/Grigori.DataAccess/Grigori.DataAccess.csproj src/Grigori.DataAccess/
 COPY src/Grigori.Infrastructure/Grigori.Infrastructure.csproj src/Grigori.Infrastructure/
 COPY src/Grigori.Mcp/Grigori.Mcp.csproj src/Grigori.Mcp/
 
-# Restore dependencies
+# Restore dependencies (without runtime identifier for Blazor static assets)
 RUN dotnet restore src/Grigori.Mcp/Grigori.Mcp.csproj
 
 # Copy source code
 COPY src/ src/
 
-# Build and publish for linux-x64
+# Build and publish - framework-dependent to include Blazor static files
 RUN dotnet publish src/Grigori.Mcp/Grigori.Mcp.csproj \
     -c Release \
-    -r linux-x64 \
     -o /app/publish \
-    --no-restore \
-    /p:PublishSingleFile=true \
-    /p:SelfContained=true \
-    /p:PublishTrimmed=false \
-    /p:IncludeNativeLibrariesForSelfExtract=true
+    -p:SelfContained=false \
+    -p:PublishSingleFile=false
 
 # -----------------------------------------------------------------------------
 # Stage 2: Download Model (for full image)
@@ -62,7 +58,7 @@ RUN curl -L -o model.onnx \
 # -----------------------------------------------------------------------------
 # Stage 3: Runtime Base
 # -----------------------------------------------------------------------------
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0 AS runtime-base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime-base
 
 # Install native dependencies for ONNX Runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -83,10 +79,10 @@ ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
     GRIGORI__ONNX__MODELPATH=/data/models/model.onnx \
     GRIGORI__ONNX__VOCABPATH=/data/models/vocab.txt \
     GRIGORI__INDEXPATH=/data/index/grigori.db \
-    GRIGORI__DASHBOARD__PORT=5151
+    ASPNETCORE_URLS=http://+:8080
 
-# Expose dashboard port
-EXPOSE 5151
+# Expose default port (can be overridden with -p)
+EXPOSE 8080
 
 # -----------------------------------------------------------------------------
 # Stage 4: Slim Image (no model, downloads on first run)
@@ -98,18 +94,15 @@ LABEL org.opencontainers.image.title="Grigori MCP Server (Slim)" \
       org.opencontainers.image.version="1.0.0" \
       org.opencontainers.image.vendor="Grigori"
 
-# Copy published app
-COPY --from=build --chown=grigori:grigori /app/publish/Grigori.Mcp /app/grigori
-
-# Copy wwwroot for dashboard static files
-COPY --from=build --chown=grigori:grigori /app/publish/wwwroot /app/wwwroot
+# Copy published app (all files since not using single-file publish)
+COPY --from=build --chown=grigori:grigori /app/publish /app
 
 # Volume for persistent data (models + index)
 VOLUME ["/data"]
 
 USER grigori
 
-ENTRYPOINT ["/app/grigori"]
+ENTRYPOINT ["dotnet", "/app/Grigori.Mcp.dll"]
 
 # -----------------------------------------------------------------------------
 # Stage 5: Full Image (model baked in)
@@ -121,11 +114,8 @@ LABEL org.opencontainers.image.title="Grigori MCP Server (Full)" \
       org.opencontainers.image.version="1.0.0" \
       org.opencontainers.image.vendor="Grigori"
 
-# Copy published app
-COPY --from=build --chown=grigori:grigori /app/publish/Grigori.Mcp /app/grigori
-
-# Copy wwwroot for dashboard static files
-COPY --from=build --chown=grigori:grigori /app/publish/wwwroot /app/wwwroot
+# Copy published app (all files since not using single-file publish)
+COPY --from=build --chown=grigori:grigori /app/publish /app
 
 # Copy pre-downloaded model
 COPY --from=model-downloader --chown=grigori:grigori /models/model.onnx /data/models/model.onnx
@@ -136,4 +126,4 @@ VOLUME ["/data/index"]
 
 USER grigori
 
-ENTRYPOINT ["/app/grigori"]
+ENTRYPOINT ["dotnet", "/app/Grigori.Mcp.dll"]

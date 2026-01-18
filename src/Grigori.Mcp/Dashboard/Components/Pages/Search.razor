@@ -1,110 +1,91 @@
-@page "/dashboard/search"
-@inject DashboardService DashboardService
+@page "/search"
 
 <PageTitle>Search - Grigori</PageTitle>
 
-<h1 class="page-title">Semantic Search</h1>
+<MudText Typo="Typo.h4" Class="mb-4">Semantic Search</MudText>
 
-<div class="search-container">
-    <div class="search-box">
-        <input type="text"
-               class="search-input"
-               placeholder="Search code semantically... (e.g., 'function that handles user authentication')"
-               @bind="_query"
-               @bind:event="oninput"
-               @onkeydown="HandleKeyDown" />
-        <button class="search-btn" @onclick="SearchAsync" disabled="@_searching">
-            @if (_searching)
-            {
-                <span>Searching...</span>
-            }
-            else
-            {
-                <span>Search</span>
-            }
-        </button>
-    </div>
-</div>
+<MudPaper Elevation="1" Class="pa-4 mb-4">
+    <MudStack Row="true" Spacing="2">
+        <MudTextField T="string"
+                      @bind-Value="_query"
+                      Placeholder="Search code semantically... (e.g., 'function that handles user authentication')"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true"
+                      OnKeyDown="HandleKeyDown"
+                      FullWidth="true" />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="() => RunSearchCommand.ExecuteAsync(null)"
+                   Disabled="@(!RunSearchCommand.CanExecute(null))"
+                   StartIcon="@(RunSearchCommand.IsLoading ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.Search)">
+            @(RunSearchCommand.IsLoading ? "Searching..." : "Search")
+        </MudButton>
+    </MudStack>
+</MudPaper>
 
-@if (_searching)
+@if (RunSearchCommand.IsLoading)
 {
-    <div class="loading">
-        <div class="spinner"></div>
-        <span>Searching...</span>
-    </div>
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
 }
 else if (_results != null)
 {
     @if (_results.Count > 0)
     {
-        <div class="results-header">
-            <span>Found @_results.Count result(s) in @_searchDuration.TotalMilliseconds.ToString("F0")ms</span>
-        </div>
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.body1">
+                Found @_results.Count result(s)
+            </MudText>
+            <MudChip T="string" Icon="@Icons.Material.Filled.Timer" Size="Size.Small" Variant="Variant.Text">
+                @_searchDuration.TotalMilliseconds.ToString("F0")ms
+            </MudChip>
+        </MudStack>
 
-        @foreach (var result in _results)
-        {
-            <div class="result-card">
-                <div class="result-header">
-                    <span class="result-path">@result.FilePath</span>
-                    <span class="result-score">@result.FormattedScore</span>
-                </div>
-                <div class="result-content">
-                    <pre class="result-code">@result.Content</pre>
-                    <div class="result-lines">@result.LineRange</div>
-                </div>
-            </div>
-        }
+        <MudStack Spacing="2">
+            @foreach (var result in _results)
+            {
+                <MudCard Elevation="1">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.body1" Style="font-family: monospace; word-break: break-all;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Small" Class="mr-1" />
+                                    @result.FilePath
+                                </MudText>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                                    @result.FormattedScore
+                                </MudChip>
+                            </MudStack>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudPaper Elevation="0" Style="background: var(--mud-palette-background); padding: 1rem; border-radius: 4px; overflow-x: auto;">
+                            <pre style="margin: 0; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.85rem; white-space: pre-wrap; word-break: break-word;">@result.Content</pre>
+                        </MudPaper>
+                        <MudText Typo="Typo.caption" Class="mt-2" Style="color: var(--mud-palette-text-secondary);">
+                            <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small" Class="mr-1" />
+                            @result.LineRange
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            }
+        </MudStack>
     }
     else
     {
-        <div class="empty-state">
-            <div class="empty-state-icon">🔍</div>
-            <p>No results found</p>
-            <p class="info-text">Try a different search query</p>
-        </div>
+        <MudAlert Severity="Severity.Warning" Icon="@Icons.Material.Filled.SearchOff">
+            <MudText>No results found. Try a different search query.</MudText>
+        </MudAlert>
     }
 }
 else
 {
-    <div class="empty-state">
-        <div class="empty-state-icon">🔎</div>
-        <p>Enter a query to search</p>
-        <p class="info-text">Use natural language to describe what you're looking for</p>
-    </div>
-}
-
-@code {
-    private string _query = string.Empty;
-    private List<SearchResult>? _results;
-    private bool _searching;
-    private TimeSpan _searchDuration;
-
-    private async Task HandleKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && !_searching)
-        {
-            await SearchAsync();
-        }
-    }
-
-    private async Task SearchAsync()
-    {
-        if (string.IsNullOrWhiteSpace(_query) || _searching)
-            return;
-
-        _searching = true;
-        _results = null;
-
-        try
-        {
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            _results = await DashboardService.SearchAsync(_query, 10);
-            sw.Stop();
-            _searchDuration = sw.Elapsed;
-        }
-        finally
-        {
-            _searching = false;
-        }
-    }
+    <MudPaper Elevation="0" Class="pa-8 text-center" Style="background: transparent;">
+        <MudIcon Icon="@Icons.Material.Filled.ManageSearch" Size="Size.Large" Style="font-size: 4rem; opacity: 0.3;" />
+        <MudText Typo="Typo.h6" Class="mt-4">Enter a query to search</MudText>
+        <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+            Use natural language to describe what you're looking for
+        </MudText>
+    </MudPaper>
 }

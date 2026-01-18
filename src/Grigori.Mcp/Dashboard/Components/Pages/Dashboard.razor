@@ -1,0 +1,138 @@
+@page "/dashboard"
+@inject DashboardService DashboardService
+
+<PageTitle>Dashboard - Grigori</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Index Overview</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_stats != null)
+{
+    <MudGrid Spacing="3" Class="mb-6">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="1" Class="pa-4">
+                <MudText Typo="Typo.overline">Code Chunks</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Primary">@_stats.TotalChunks.ToString("N0")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="1" Class="pa-4">
+                <MudText Typo="Typo.overline">Files Indexed</MudText>
+                <MudText Typo="Typo.h4">@_stats.TotalFiles.ToString("N0")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="1" Class="pa-4">
+                <MudText Typo="Typo.overline">Index Size</MudText>
+                <MudText Typo="Typo.h4">@_stats.FormattedSize</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="1" Class="pa-4">
+                <MudText Typo="Typo.overline">HNSW Index</MudText>
+                <MudText Typo="Typo.h4" Color="@(_stats.HnswBuilt ? Color.Success : Color.Warning)">
+                    @(_stats.HnswBuilt ? "Active" : "Inactive")
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudPaper Elevation="1" Class="pa-4 mb-6">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <div>
+                <MudText Typo="Typo.body2">
+                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1" />
+                    Last Updated: @_stats.FormattedLastUpdated
+                </MudText>
+            </div>
+            <div>
+                @if (_stats.HnswBuilt)
+                {
+                    <MudChip T="string" Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small">
+                        HNSW: @_stats.HnswVectorCount.ToString("N0") vectors
+                    </MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small">
+                        Using linear search
+                    </MudChip>
+                }
+            </div>
+        </MudStack>
+    </MudPaper>
+
+    @if (_projects.Count > 0)
+    {
+        <MudText Typo="Typo.h5" Class="mb-4">Indexed Projects</MudText>
+        <MudGrid Spacing="3">
+            @foreach (var project in _projects)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Elevation="1">
+                        <MudCardHeader>
+                            <CardHeaderAvatar>
+                                <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" />
+                            </CardHeaderAvatar>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">@project.Name</MudText>
+                                <MudText Typo="Typo.caption" Style="word-break: break-all;">@project.Path</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudStack Row="true" Spacing="4" Class="mb-2">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                    @project.FileCount.ToString("N0") files
+                                </MudChip>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                    @project.ChunkCount.ToString("N0") chunks
+                                </MudChip>
+                            </MudStack>
+                            <MudText Typo="Typo.caption" Class="mb-2" Style="font-family: monospace;">
+                                @project.ExtensionsSummary
+                            </MudText>
+                            <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
+                                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1" />
+                                @project.FormattedLastIndexed
+                            </MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+}
+else
+{
+    <MudAlert Severity="Severity.Info" Icon="@Icons.Material.Filled.Info" Class="mt-4">
+        <MudText>No index data available. Index a directory to get started.</MudText>
+    </MudAlert>
+}
+
+@code {
+    private IndexStats? _stats;
+    private List<IndexedProject> _projects = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatsAsync();
+    }
+
+    private async Task LoadStatsAsync()
+    {
+        _loading = true;
+        try
+        {
+            _stats = await DashboardService.GetIndexStatsAsync();
+            _projects = await DashboardService.GetIndexedProjectsAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

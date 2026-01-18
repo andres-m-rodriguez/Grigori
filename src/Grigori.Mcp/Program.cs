@@ -16,17 +16,32 @@ using Grigori.Mcp.Features.Metrics.Endpoints;
 using Grigori.Mcp.Features.Search.Endpoints;
 using Grigori.Mcp.Features.Search.Services;
 using ModelContextProtocol.Server;
+using MudBlazor.Services;
 
-var builder = WebApplication.CreateBuilder(args);
+// Determine the application directory
+// For single-file publish: use the executable's directory
+// For framework-dependent: use AppContext.BaseDirectory (the DLL location)
+var processPath = Environment.ProcessPath;
+var isSingleFile = processPath != null &&
+    !processPath.EndsWith("dotnet", StringComparison.OrdinalIgnoreCase) &&
+    !processPath.EndsWith("dotnet.exe", StringComparison.OrdinalIgnoreCase);
+
+var appDir = isSingleFile
+    ? Path.GetDirectoryName(processPath)!
+    : AppContext.BaseDirectory;
+
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = appDir,
+    WebRootPath = Path.Combine(appDir, "wwwroot")
+});
 
 // Check run mode
 var mcpMode = args.Contains("--mcp");             // stdio MCP mode (for local use)
 var mcpHttpMode = args.Contains("--mcp-http");    // HTTP MCP mode (for remote AI clients)
 var serverMode = args.Contains("--server");        // HTTP server mode (for Docker/shared)
 var dashboardOnly = args.Contains("--dashboard");  // Dashboard only
-
-var dashboardPort = builder.Configuration.GetValue("Grigori:Dashboard:Port", 5151);
-var apiPort = builder.Configuration.GetValue("Grigori:Api:Port", 5152);
 
 // Default to server mode if no flags provided
 if (!mcpMode && !mcpHttpMode && !dashboardOnly)
@@ -55,6 +70,9 @@ builder.Services.AddScoped<DashboardService>();
 // Add Blazor services
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Add MudBlazor
+builder.Services.AddMudServices();
 
 // Add CORS for API access
 builder.Services.AddCors(options =>
@@ -92,12 +110,6 @@ if (mcpMode || mcpHttpMode)
             .WithToolsFromAssembly();
     }
 }
-
-// Configure Kestrel
-builder.WebHost.ConfigureKestrel(options =>
-{
-    options.ListenAnyIP(dashboardPort);  // Dashboard + API
-});
 
 var app = builder.Build();
 
@@ -202,11 +214,7 @@ app.MapPost("/api/index/files", async Task<IResult> (IndexFilesRequest request, 
 // Dashboard (Blazor)
 // ============================================================================
 
-// Redirect root to dashboard
-app.MapGet("/", () => Results.Redirect("/dashboard"));
-
-// Configure Blazor dashboard at /dashboard path
-app.UsePathBase("/dashboard");
+app.UseRouting();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
@@ -217,33 +225,37 @@ app.MapRazorComponents<App>()
 // Startup
 // ============================================================================
 
+// Start the app and get actual URLs
+await app.StartAsync();
+var urls = app.Urls.ToList();
+var baseUrl = urls.FirstOrDefault() ?? "http://localhost:5000";
+
 if (mcpMode)
 {
     // MCP stdio mode - runs MCP server + dashboard
     Console.Error.WriteLine($"Grigori MCP Server started (stdio transport)");
-    Console.Error.WriteLine($"  Dashboard: http://localhost:{dashboardPort}/dashboard");
-    _ = Task.Run(() => app.RunAsync());
+    Console.Error.WriteLine($"  Dashboard: {baseUrl}");
     await Task.Delay(Timeout.Infinite);
 }
 else if (mcpHttpMode)
 {
     // MCP HTTP mode - runs MCP server over HTTP + REST API + Dashboard
     Console.WriteLine($"Grigori MCP Server started (HTTP transport)");
-    Console.WriteLine($"  MCP SSE:   http://localhost:{dashboardPort}/sse");
-    Console.WriteLine($"  MCP Msg:   http://localhost:{dashboardPort}/message");
-    Console.WriteLine($"  Dashboard: http://localhost:{dashboardPort}/dashboard");
-    Console.WriteLine($"  API:       http://localhost:{dashboardPort}/api");
-    Console.WriteLine($"  Health:    http://localhost:{dashboardPort}/api/health");
-    await app.RunAsync();
+    Console.WriteLine($"  MCP SSE:   {baseUrl}/sse");
+    Console.WriteLine($"  MCP Msg:   {baseUrl}/message");
+    Console.WriteLine($"  Dashboard: {baseUrl}");
+    Console.WriteLine($"  API:       {baseUrl}/api");
+    Console.WriteLine($"  Health:    {baseUrl}/api/health");
+    await app.WaitForShutdownAsync();
 }
 else
 {
     // Server mode - HTTP API + Dashboard (no MCP)
     Console.WriteLine($"Grigori Server started");
-    Console.WriteLine($"  Dashboard: http://localhost:{dashboardPort}/dashboard");
-    Console.WriteLine($"  API:       http://localhost:{dashboardPort}/api");
-    Console.WriteLine($"  Health:    http://localhost:{dashboardPort}/api/health");
-    await app.RunAsync();
+    Console.WriteLine($"  Dashboard: {baseUrl}");
+    Console.WriteLine($"  API:       {baseUrl}/api");
+    Console.WriteLine($"  Health:    {baseUrl}/api/health");
+    await app.WaitForShutdownAsync();
 }
 
 // ============================================================================
