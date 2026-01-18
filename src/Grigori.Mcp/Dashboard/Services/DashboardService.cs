@@ -1,3 +1,4 @@
+using Grigori.Contracts.Dtos.Index;
 using Grigori.Contracts.Dtos.Metrics;
 using Grigori.Contracts.Interfaces;
 using Grigori.Database;
@@ -12,10 +13,14 @@ public class DashboardService
     private readonly HnswIndex _hnswIndex;
     private readonly IServiceProvider _serviceProvider;
 
-    // Lazy-load embedding provider to avoid blocking page render
+    // Lazy-load providers to avoid blocking page render
     private IEmbeddingProvider? _embeddingProvider;
     private IEmbeddingProvider EmbeddingProvider =>
         _embeddingProvider ??= _serviceProvider.GetRequiredService<IEmbeddingProvider>();
+
+    private IIndexService? _indexService;
+    private IIndexService IndexService =>
+        _indexService ??= _serviceProvider.GetRequiredService<IIndexService>();
 
     public DashboardService(
         GrigoriDbContext dbContext,
@@ -295,6 +300,82 @@ public class DashboardService
 
         return result;
     }
+
+    #region Project Management
+
+    public async Task<ProjectDeleteResult> DeleteProjectAsync(string projectName)
+    {
+        var deletedCount = await _dbContext.DeleteByProjectPrefixAsync(projectName);
+
+        // Rebuild HNSW index after deletion if it was built
+        if (_hnswIndex.IsBuilt && deletedCount > 0)
+        {
+            await RebuildHnswIndexAsync();
+        }
+
+        return new ProjectDeleteResult
+        {
+            Success = true,
+            ProjectName = projectName,
+            ChunksDeleted = deletedCount
+        };
+    }
+
+    public async Task<IndexResultDto> IndexNewProjectAsync(string directoryPath, string? projectName = null)
+    {
+        var request = new IndexRequestDto
+        {
+            Path = directoryPath,
+            ProjectName = projectName ?? Path.GetFileName(directoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+        };
+
+        var result = await IndexService.IndexDirectoryAsync(request);
+
+        if (result.IsSuccess)
+        {
+            // Rebuild HNSW index after indexing
+            await RebuildHnswIndexAsync();
+            return result.Value;
+        }
+
+        return new IndexResultDto
+        {
+            Success = false,
+            FilesIndexed = 0,
+            ChunksCreated = 0,
+            DurationMs = 0,
+            Message = result.Error.Message
+        };
+    }
+
+    public async Task<IndexResultDto> ReindexProjectAsync(string projectName, string originalPath)
+    {
+        // First delete existing chunks
+        await _dbContext.DeleteByProjectPrefixAsync(projectName);
+
+        // Re-index the directory
+        return await IndexNewProjectAsync(originalPath, projectName);
+    }
+
+    private async Task RebuildHnswIndexAsync()
+    {
+        var allChunks = await _dbContext.GetAllChunksAsync();
+        if (allChunks.Count > 0)
+        {
+            var vectors = allChunks.Select(c => (c.Id, DeserializeEmbedding(c.Embedding))).ToList();
+            _hnswIndex.BuildIndex(vectors);
+        }
+        // If no chunks remain, the index will report IsBuilt = false naturally
+    }
+
+    #endregion
+}
+
+public class ProjectDeleteResult
+{
+    public bool Success { get; set; }
+    public string ProjectName { get; set; } = string.Empty;
+    public int ChunksDeleted { get; set; }
 }
 
 public class IndexStats

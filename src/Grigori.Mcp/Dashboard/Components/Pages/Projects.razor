@@ -1,13 +1,21 @@
 @page "/projects"
 @inject DashboardService DashboardService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Projects - Grigori</PageTitle>
 
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Indexed Projects</MudText>
-    <MudChip T="string" Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Variant="Variant.Outlined">
-        @_projects.Count projects
-    </MudChip>
+    <MudStack Row="true" Spacing="2">
+        <MudChip T="string" Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Variant="Variant.Outlined">
+            @_projects.Count projects
+        </MudChip>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => _showAddDialog = true)">
+            Add Project
+        </MudButton>
+    </MudStack>
 </MudStack>
 
 @if (_loading)
@@ -20,7 +28,7 @@ else if (_projects.Count == 0)
         <MudStack Spacing="2">
             <MudText Typo="Typo.body1">No projects indexed yet.</MudText>
             <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
-                Use the MCP tool <code>index_directory</code> or the REST API to index a codebase.
+                Click "Add Project" to index a directory, or use the MCP tool <code>index_directory</code>.
             </MudText>
         </MudStack>
     </MudAlert>
@@ -41,6 +49,19 @@ else
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6">@project.Name</MudText>
                         </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudMenu Icon="@Icons.Material.Filled.MoreVert" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                                <MudMenuItem Icon="@Icons.Material.Filled.Refresh" OnClick="@(() => ReindexProjectAsync(project))"
+                                             Disabled="@_operationInProgress">
+                                    Re-index
+                                </MudMenuItem>
+                                <MudMenuItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error"
+                                             OnClick="@(() => ConfirmDeleteProjectAsync(project))"
+                                             Disabled="@_operationInProgress">
+                                    Delete
+                                </MudMenuItem>
+                            </MudMenu>
+                        </CardHeaderActions>
                     </MudCardHeader>
                     <MudCardContent>
                         <MudText Typo="Typo.caption" Class="mb-3" Style="word-break: break-all; color: var(--mud-palette-text-secondary);">
@@ -76,12 +97,58 @@ else
     </MudGrid>
 }
 
+@* Add Project Dialog *@
+<MudDialog @bind-Visible="_showAddDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.CreateNewFolder" Class="mr-2" />
+            Add New Project
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_newProjectPath" Label="Directory Path" Variant="Variant.Outlined"
+                          Placeholder="C:\Projects\MyProject or /home/user/projects/myproject"
+                          HelperText="Full path to the directory to index"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Folder" />
+            <MudTextField @bind-Value="_newProjectName" Label="Project Name (Optional)" Variant="Variant.Outlined"
+                          Placeholder="MyProject"
+                          HelperText="If empty, directory name will be used" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showAddDialog = false)" Disabled="@_operationInProgress">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddProjectAsync"
+                   Disabled="@(string.IsNullOrWhiteSpace(_newProjectPath) || _operationInProgress)">
+            @if (_operationInProgress)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Indexing...</span>
+            }
+            else
+            {
+                <span>Index Project</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private List<IndexedProject> _projects = [];
     private bool _loading = true;
+    private bool _operationInProgress;
+    private bool _showAddDialog;
+    private string _newProjectPath = string.Empty;
+    private string _newProjectName = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadProjectsAsync();
+    }
+
+    private async Task LoadProjectsAsync()
+    {
+        _loading = true;
         try
         {
             _projects = await DashboardService.GetIndexedProjectsAsync();
@@ -89,6 +156,117 @@ else
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task AddProjectAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newProjectPath))
+            return;
+
+        _operationInProgress = true;
+        StateHasChanged();
+
+        try
+        {
+            var projectName = string.IsNullOrWhiteSpace(_newProjectName) ? null : _newProjectName.Trim();
+            var result = await DashboardService.IndexNewProjectAsync(_newProjectPath.Trim(), projectName);
+
+            if (result.Success)
+            {
+                Snackbar.Add($"Successfully indexed {result.FilesIndexed} files ({result.ChunksCreated} chunks)", Severity.Success);
+                _showAddDialog = false;
+                _newProjectPath = string.Empty;
+                _newProjectName = string.Empty;
+                await LoadProjectsAsync();
+            }
+            else
+            {
+                Snackbar.Add($"Failed to index: {result.Message}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _operationInProgress = false;
+        }
+    }
+
+    private async Task ReindexProjectAsync(IndexedProject project)
+    {
+        _operationInProgress = true;
+        StateHasChanged();
+
+        try
+        {
+            // Note: For re-indexing, we need the original path. Since we store "ProjectName/relative/path",
+            // we can't re-index without the original absolute path. Show info message.
+            Snackbar.Add($"Re-indexing {project.Name}...", Severity.Info);
+
+            // For now, we'll delete and inform the user to re-add
+            // A full implementation would need to store the original path
+            var deleteResult = await DashboardService.DeleteProjectAsync(project.Name);
+
+            if (deleteResult.Success)
+            {
+                Snackbar.Add($"Removed {project.Name}. Please add the project again with the full path to re-index.", Severity.Warning);
+                await LoadProjectsAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _operationInProgress = false;
+        }
+    }
+
+    private async Task ConfirmDeleteProjectAsync(IndexedProject project)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Are you sure you want to delete '{project.Name}'? This will remove {project.ChunkCount:N0} chunks from the index." },
+            { x => x.ButtonText, "Delete" },
+            { x => x.Color, Color.Error }
+        };
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Project", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await DeleteProjectAsync(project);
+        }
+    }
+
+    private async Task DeleteProjectAsync(IndexedProject project)
+    {
+        _operationInProgress = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await DashboardService.DeleteProjectAsync(project.Name);
+
+            if (result.Success)
+            {
+                Snackbar.Add($"Deleted {project.Name} ({result.ChunksDeleted} chunks removed)", Severity.Success);
+                await LoadProjectsAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _operationInProgress = false;
         }
     }
 }

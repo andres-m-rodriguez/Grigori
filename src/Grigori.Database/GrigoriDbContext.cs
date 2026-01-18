@@ -230,6 +230,33 @@ public class GrigoriDbContext : IDisposable, IAsyncDisposable
         return await cmd.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task<int> DeleteByProjectPrefixAsync(string projectPrefix, CancellationToken cancellationToken = default)
+    {
+        await using var cmd = _connection.CreateCommand();
+        // Match files that start with "ProjectName/" pattern
+        cmd.CommandText = "DELETE FROM chunks WHERE file_path LIKE @prefix";
+        cmd.Parameters.AddWithValue("@prefix", $"{projectPrefix}/%");
+
+        return await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<List<string>> GetDistinctFilePathsByProjectAsync(string projectPrefix, CancellationToken cancellationToken = default)
+    {
+        var paths = new List<string>();
+
+        await using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT DISTINCT file_path FROM chunks WHERE file_path LIKE @prefix";
+        cmd.Parameters.AddWithValue("@prefix", $"{projectPrefix}/%");
+
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            paths.Add(reader.GetString(0));
+        }
+
+        return paths;
+    }
+
     public async Task<bool> HasContentHashAsync(string filePath, string contentHash, CancellationToken cancellationToken = default)
     {
         await using var cmd = _connection.CreateCommand();
