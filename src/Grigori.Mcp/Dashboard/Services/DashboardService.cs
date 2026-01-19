@@ -3,6 +3,7 @@ using Grigori.Contracts.Dtos.Search;
 using Grigori.Contracts.Interfaces;
 using Grigori.Database;
 using Grigori.Infrastructure.Indexing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Grigori.Mcp.Dashboard.Services;
@@ -30,7 +31,7 @@ public class DashboardService
 
     public async Task<IndexStats> GetIndexStatsAsync()
     {
-        var chunks = await _dbContext.GetAllChunksAsync();
+        var chunks = await _dbContext.Chunks.ToListAsync();
 
         var uniqueFiles = chunks
             .Select(c => c.FilePath)
@@ -54,7 +55,7 @@ public class DashboardService
 
     public async Task<List<IndexedProject>> GetIndexedProjectsAsync()
     {
-        var chunks = await _dbContext.GetAllChunksAsync();
+        var chunks = await _dbContext.Chunks.ToListAsync();
 
         if (chunks.Count == 0)
             return [];
@@ -150,41 +151,68 @@ public class DashboardService
 
     public async Task<List<ActivityLogDto>> GetRecentActivityAsync(int limit = 20)
     {
-        var logs = await _dbContext.GetRecentActivityLogsAsync(limit);
-        return logs.Select(l => new ActivityLogDto
-        {
-            Id = l.Id,
-            ActivityType = l.ActivityType,
-            Description = l.Description,
-            DurationMs = l.DurationMs,
-            Timestamp = l.Timestamp,
-            Details = l.Details
-        }).ToList();
+        var logs = await _dbContext.ActivityLogs
+            .OrderByDescending(l => l.Timestamp)
+            .Take(limit)
+            .Select(l => new ActivityLogDto
+            {
+                Id = l.Id,
+                ActivityType = l.ActivityType,
+                Description = l.Description,
+                DurationMs = l.DurationMs,
+                Timestamp = l.Timestamp,
+                Details = l.Details
+            })
+            .ToListAsync();
+
+        return logs;
     }
 
     public async Task<List<SearchHistoryDto>> GetSearchHistoryAsync(int limit = 20)
     {
-        var history = await _dbContext.GetRecentSearchHistoryAsync(limit);
-        return history.Select(h => new SearchHistoryDto
-        {
-            Id = h.Id,
-            Query = h.Query,
-            ResultCount = h.ResultCount,
-            DurationMs = h.DurationMs,
-            CacheHit = h.CacheHit,
-            UsedHnsw = h.UsedHnsw,
-            Timestamp = h.Timestamp
-        }).ToList();
+        var history = await _dbContext.SearchHistories
+            .OrderByDescending(h => h.Timestamp)
+            .Take(limit)
+            .Select(h => new SearchHistoryDto
+            {
+                Id = h.Id,
+                Query = h.Query,
+                ResultCount = h.ResultCount,
+                DurationMs = h.DurationMs,
+                CacheHit = h.CacheHit,
+                UsedHnsw = h.UsedHnsw,
+                Timestamp = h.Timestamp
+            })
+            .ToListAsync();
+
+        return history;
     }
 
     public async Task<List<PerformanceDataPointDto>> GetPerformanceMetricsAsync(int hoursBack = 24)
     {
-        var dbMetrics = await _dbContext.GetHourlyPerformanceMetricsAsync(hoursBack);
+        var cutoff = DateTime.UtcNow.AddHours(-hoursBack);
 
-        // Create a lookup for the actual data
-        var metricsLookup = dbMetrics.ToDictionary(
-            m => m.Hour.ToString("yyyy-MM-dd HH:00"),
-            m => (m.AvgSearchTimeMs, m.AvgIndexTimeMs));
+        // Get search metrics grouped by hour
+        var searchMetrics = await _dbContext.SearchHistories
+            .Where(s => s.Timestamp >= cutoff)
+            .GroupBy(s => new { s.Timestamp.Year, s.Timestamp.Month, s.Timestamp.Day, s.Timestamp.Hour })
+            .Select(g => new
+            {
+                Hour = new DateTime(g.Key.Year, g.Key.Month, g.Key.Day, g.Key.Hour, 0, 0, DateTimeKind.Utc),
+                AvgSearchMs = g.Average(s => s.DurationMs)
+            })
+            .ToDictionaryAsync(x => x.Hour, x => x.AvgSearchMs);
+
+        // Get indexing metrics grouped by hour
+        var indexMetrics = await _dbContext.ActivityLogs
+            .Where(a => a.Timestamp >= cutoff && a.ActivityType == "indexing")
+            .GroupBy(a => new { a.Timestamp.Year, a.Timestamp.Month, a.Timestamp.Day, a.Timestamp.Hour })
+            .Select(g => new
+            {
+                Hour = new DateTime(g.Key.Year, g.Key.Month, g.Key.Day, g.Key.Hour, 0, 0, DateTimeKind.Utc),
+                AvgIndexMs = g.Average(a => a.DurationMs)
+            })
+            .ToDictionaryAsync(x => x.Hour, x => x.AvgIndexMs);
 
         // Generate all hours in the range
         var result = new List<PerformanceDataPointDto>();
@@ -195,26 +223,13 @@ public class DashboardService
         for (int i = 0; i < hoursBack; i++)
         {
             var hour = startHour.AddHours(i);
-            var key = hour.ToString("yyyy-MM-dd HH:00");
 
-            if (metricsLookup.TryGetValue(key, out var data))
+            result.Add(new PerformanceDataPointDto
             {
-                result.Add(new PerformanceDataPointDto
-                {
-                    Timestamp = hour,
-                    AvgSearchTimeMs = data.AvgSearchTimeMs,
-                    AvgIndexTimeMs = data.AvgIndexTimeMs
-                });
-            }
-            else
-            {
-                result.Add(new PerformanceDataPointDto
-                {
-                    Timestamp = hour,
-                    AvgSearchTimeMs = 0,
-                    AvgIndexTimeMs = 0
-                });
-            }
+                Timestamp = hour,
+                AvgSearchTimeMs = searchMetrics.TryGetValue(hour, out var searchMs) ? searchMs : 0,
+                AvgIndexTimeMs = indexMetrics.TryGetValue(hour, out var indexMs) ? indexMs : 0
+            });
         }
 
         return result;

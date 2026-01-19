@@ -199,7 +199,7 @@ public class IndexService : IIndexService
     private async Task<Result<int, GrigoriError>> IndexFileCoreAsync(string filePath, string storedPath, CancellationToken cancellationToken)
     {
         var content = await File.ReadAllTextAsync(filePath, cancellationToken);
-        var contentHash = GrigoriDbContext.ComputeHash(content);
+        var contentHash = HashUtility.ComputeHash(content);
 
         if (await _chunkRepository.HasContentHashAsync(storedPath, contentHash, cancellationToken))
         {

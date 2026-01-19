@@ -46,7 +46,7 @@ public class ChunkingService
         return chunk with
         {
             Content = contextPrefix + chunk.Content,
-            ContentHash = GrigoriDbContext.ComputeHash(chunk.Content),
+            ContentHash = HashUtility.ComputeHash(chunk.Content),
             Features = features
         };
     }

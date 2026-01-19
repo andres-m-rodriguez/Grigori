@@ -2,6 +2,8 @@ using Grigori.Contracts.Dtos.Notes;
 using Grigori.Contracts.Interfaces;
 using Grigori.Contracts.Results;
 using Grigori.Database;
+using Grigori.Database.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Grigori.DataAccess.Repositories;
@@ -25,8 +27,14 @@ public class MentalNoteRepository : IMentalNoteRepository
     {
         try
         {
-            var notes = await _dbContext.GetMentalNotesByProjectAsync(projectName, cancellationToken);
-            return notes.Select(ToDto).ToList();
+            var notes = await _dbContext.MentalNotes
+                .Where(n => n.ProjectName == projectName)
+                .OrderByDescending(n => n.Priority)
+                .ThenByDescending(n => n.CreatedAt)
+                .Select(n => ToDto(n))
+                .ToListAsync(cancellationToken);
+
+            return notes;
         }
         catch (Exception ex)
         {
@@ -42,8 +50,15 @@ public class MentalNoteRepository : IMentalNoteRepository
     {
         try
         {
-            var notes = await _dbContext.GetMentalNotesByCategoryAsync(projectName, (int)category, cancellationToken);
-            return notes.Select(ToDto).ToList();
+            var categoryInt = (int)category;
+            var notes = await _dbContext.MentalNotes
+                .Where(n => n.ProjectName == projectName && n.Category == categoryInt)
+                .OrderByDescending(n => n.Priority)
+                .ThenByDescending(n => n.CreatedAt)
+                .Select(n => ToDto(n))
+                .ToListAsync(cancellationToken);
+
+            return notes;
         }
         catch (Exception ex)
         {
@@ -64,8 +79,14 @@ public class MentalNoteRepository : IMentalNoteRepository
                 return new List<MentalNoteDto>();
             }
 
-            var notes = await _dbContext.GetMentalNotesByTagsAsync(projectName, tags, cancellationToken);
-            return notes.Select(ToDto).ToList();
+            var notes = await _dbContext.MentalNotes
+                .Where(n => n.ProjectName == projectName && n.Tags != null && tags.Any(t => n.Tags.Contains(t)))
+                .OrderByDescending(n => n.Priority)
+                .ThenByDescending(n => n.CreatedAt)
+                .Select(n => ToDto(n))
+                .ToListAsync(cancellationToken);
+
+            return notes;
         }
         catch (Exception ex)
         {
@@ -80,8 +101,12 @@ public class MentalNoteRepository : IMentalNoteRepository
     {
         try
         {
-            var note = await _dbContext.GetMentalNoteByIdAsync(id, cancellationToken);
-            return note is not null ? ToDto(note) : null;
+            var note = await _dbContext.MentalNotes
+                .Where(n => n.Id == id)
+                .Select(n => ToDto(n))
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return note;
         }
         catch (Exception ex)
         {
@@ -96,19 +121,23 @@ public class MentalNoteRepository : IMentalNoteRepository
     {
         try
         {
-            var tags = request.Tags.Count > 0 ? string.Join(",", request.Tags) : null;
+            var now = DateTime.UtcNow;
+            var entity = new MentalNote
+            {
+                ProjectName = request.ProjectName,
+                Category = (int)request.Category,
+                Title = request.Title,
+                Content = request.Content,
+                Tags = request.Tags.Count > 0 ? string.Join(",", request.Tags) : null,
+                Priority = request.Priority,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
 
-            var id = await _dbContext.InsertMentalNoteAsync(
-                request.ProjectName,
-                (int)request.Category,
-                request.Title,
-                request.Content,
-                tags,
-                request.Priority,
-                cancellationToken);
+            _dbContext.MentalNotes.Add(entity);
+            await _dbContext.SaveChangesAsync(cancellationToken);
 
-            var note = await _dbContext.GetMentalNoteByIdAsync(id, cancellationToken);
-            return ToDto(note!);
+            return ToDto(entity);
         }
         catch (Exception ex)
         {
@@ -124,32 +153,28 @@ public class MentalNoteRepository : IMentalNoteRepository
     {
         try
         {
-            var existingNote = await _dbContext.GetMentalNoteByIdAsync(id, cancellationToken);
-            if (existingNote is null)
+            var entity = await _dbContext.MentalNotes.FindAsync([id], cancellationToken);
+            if (entity is null)
             {
                 return GrigoriError.NotFound("Mental note", id.ToString());
             }
 
-            var tags = request.Tags is not null
-                ? (request.Tags.Count > 0 ? string.Join(",", request.Tags) : "")
-                : null;
+            if (request.Category.HasValue)
+                entity.Category = (int)request.Category.Value;
+            if (request.Title is not null)
+                entity.Title = request.Title;
+            if (request.Content is not null)
+                entity.Content = request.Content;
+            if (request.Tags is not null)
+                entity.Tags = request.Tags.Count > 0 ? string.Join(",", request.Tags) : null;
+            if (request.Priority.HasValue)
+                entity.Priority = request.Priority.Value;
 
-            var updated = await _dbContext.UpdateMentalNoteAsync(
-                id,
-                request.Category.HasValue ? (int)request.Category.Value : null,
-                request.Title,
-                request.Content,
-                tags,
-                request.Priority,
-                cancellationToken);
+            entity.UpdatedAt = DateTime.UtcNow;
 
-            if (!updated)
-            {
-                return GrigoriError.DatabaseError("Failed to update note");
-            }
+            await _dbContext.SaveChangesAsync(cancellationToken);
 
-            var note = await _dbContext.GetMentalNoteByIdAsync(id, cancellationToken);
-            return ToDto(note!);
+            return ToDto(entity);
         }
         catch (Exception ex)
         {
@@ -164,11 +189,15 @@ public class MentalNoteRepository : IMentalNoteRepository
     {
         try
         {
-            var deleted = await _dbContext.DeleteMentalNoteAsync(id, cancellationToken);
-            if (!deleted)
+            var deleted = await _dbContext.MentalNotes
+                .Where(n => n.Id == id)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            if (deleted == 0)
             {
                 return GrigoriError.NotFound("Mental note", id.ToString());
             }
+
             return true;
         }
         catch (Exception ex)
@@ -190,8 +219,15 @@ public class MentalNoteRepository : IMentalNoteRepository
                 return await GetByProjectAsync(projectName, cancellationToken);
             }
 
-            var notes = await _dbContext.SearchMentalNotesAsync(projectName, query, cancellationToken);
-            return notes.Select(ToDto).ToList();
+            var notes = await _dbContext.MentalNotes
+                .Where(n => n.ProjectName == projectName &&
+                           (n.Title.Contains(query) || n.Content.Contains(query)))
+                .OrderByDescending(n => n.Priority)
+                .ThenByDescending(n => n.CreatedAt)
+                .Select(n => ToDto(n))
+                .ToListAsync(cancellationToken);
+
+            return notes;
         }
         catch (Exception ex)
         {
@@ -200,19 +236,16 @@ public class MentalNoteRepository : IMentalNoteRepository
         }
     }
 
-    private static MentalNoteDto ToDto(Database.Models.MentalNote note)
+    private static MentalNoteDto ToDto(MentalNote note) => new()
     {
-        return new MentalNoteDto
-        {
-            Id = note.Id,
-            ProjectName = note.ProjectName,
-            Category = (NoteCategory)note.Category,
-            Title = note.Title,
-            Content = note.Content,
-            Tags = note.Tags?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() ?? [],
-            Priority = note.Priority,
-            CreatedAt = note.CreatedAt,
-            UpdatedAt = note.UpdatedAt
-        };
-    }
+        Id = note.Id,
+        ProjectName = note.ProjectName,
+        Category = (NoteCategory)note.Category,
+        Title = note.Title,
+        Content = note.Content,
+        Tags = note.Tags?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() ?? [],
+        Priority = note.Priority,
+        CreatedAt = note.CreatedAt,
+        UpdatedAt = note.UpdatedAt
+    };
 }

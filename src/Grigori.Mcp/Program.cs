@@ -3,6 +3,7 @@ using Grigori.Contracts.Interfaces;
 using Grigori.Contracts.Options;
 using Grigori.Database;
 using Grigori.Database.Extensions;
+using Microsoft.EntityFrameworkCore;
 using Grigori.DataAccess.Extensions;
 using Grigori.Infrastructure.Extensions;
 using Grigori.Infrastructure.Indexing;
@@ -112,6 +113,13 @@ else if (serverMode || mcpHttpMode)
 }
 
 var app = builder.Build();
+
+// Ensure database is created
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<GrigoriDbContext>();
+    await dbContext.Database.EnsureCreatedAsync();
+}
 
 // Eagerly initialize embedding provider to start background model loading
 // This triggers registration with the dependency tracker

@@ -1,6 +1,7 @@
 using Grigori.Contracts.Dtos.Metrics;
 using Grigori.Contracts.Interfaces;
 using Grigori.Database;
+using Grigori.Database.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace Grigori.Infrastructure.Metrics;
@@ -166,7 +167,18 @@ public class MetricsService : IMetricsService
         // Persist to database
         try
         {
-            await _dbContext.InsertSearchHistoryAsync(query, resultCount, durationMs, cacheHit, usedHnsw, cancellationToken);
+            var entity = new SearchHistory
+            {
+                Query = query,
+                ResultCount = resultCount,
+                DurationMs = durationMs,
+                CacheHit = cacheHit,
+                UsedHnsw = usedHnsw,
+                Timestamp = DateTime.UtcNow
+            };
+
+            _dbContext.SearchHistories.Add(entity);
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -191,7 +203,17 @@ public class MetricsService : IMetricsService
                 ChunkCount = chunkCount
             });
 
-            await _dbContext.InsertActivityLogAsync("indexing", description, durationMs, details, cancellationToken);
+            var entity = new ActivityLog
+            {
+                ActivityType = "indexing",
+                Description = description,
+                DurationMs = durationMs,
+                Details = details,
+                Timestamp = DateTime.UtcNow
+            };
+
+            _dbContext.ActivityLogs.Add(entity);
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
         catch (Exception ex)
         {

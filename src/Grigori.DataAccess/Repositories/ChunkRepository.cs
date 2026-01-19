@@ -2,6 +2,8 @@ using Grigori.Contracts.Interfaces;
 using Grigori.Contracts.Options;
 using Grigori.Contracts.Results;
 using Grigori.Database;
+using Grigori.Database.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -30,20 +32,22 @@ public class ChunkRepository : IChunkRepository
     {
         try
         {
-            var embeddingBytes = SerializeEmbedding(embedding);
-            var features = input.Features.Count > 0 ? string.Join(",", input.Features) : null;
+            var entity = new CodeChunk
+            {
+                FilePath = input.FilePath,
+                StartLine = input.StartLine,
+                EndLine = input.EndLine,
+                Content = input.Content,
+                ContentHash = input.ContentHash,
+                Embedding = SerializeEmbedding(embedding),
+                Features = input.Features.Count > 0 ? string.Join(",", input.Features) : null,
+                IndexedAt = DateTime.UtcNow
+            };
 
-            var id = await _dbContext.InsertChunkAsync(
-                input.FilePath,
-                input.StartLine,
-                input.EndLine,
-                input.Content,
-                input.ContentHash,
-                embeddingBytes,
-                features,
-                cancellationToken);
+            _dbContext.Chunks.Add(entity);
+            await _dbContext.SaveChangesAsync(cancellationToken);
 
-            return id;
+            return entity.Id;
         }
         catch (Exception ex)
         {
@@ -64,15 +68,22 @@ public class ChunkRepository : IChunkRepository
 
         try
         {
-            var chunks = inputs.Zip(embeddings, (input, embedding) =>
+            var entities = inputs.Zip(embeddings, (input, embedding) => new CodeChunk
             {
-                var embeddingBytes = SerializeEmbedding(embedding);
-                var features = input.Features.Count > 0 ? string.Join(",", input.Features) : null;
-                return (input.FilePath, input.StartLine, input.EndLine, input.Content, input.ContentHash, embeddingBytes, features);
+                FilePath = input.FilePath,
+                StartLine = input.StartLine,
+                EndLine = input.EndLine,
+                Content = input.Content,
+                ContentHash = input.ContentHash,
+                Embedding = SerializeEmbedding(embedding),
+                Features = input.Features.Count > 0 ? string.Join(",", input.Features) : null,
+                IndexedAt = DateTime.UtcNow
             }).ToList();
 
-            var count = await _dbContext.InsertChunksBatchAsync(chunks, cancellationToken);
-            return count;
+            _dbContext.Chunks.AddRange(entities);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            return entities.Count;
         }
         catch (Exception ex)
         {
@@ -91,7 +102,22 @@ public class ChunkRepository : IChunkRepository
     {
         try
         {
-            var chunks = await _dbContext.SearchChunksAsync(fileExtensions, requiredFeatures, cancellationToken);
+            var query = _dbContext.Chunks.AsQueryable();
+
+            if (fileExtensions is { Count: > 0 })
+            {
+                query = query.Where(c => fileExtensions.Any(ext => c.FilePath.EndsWith(ext)));
+            }
+
+            if (requiredFeatures is { Count: > 0 })
+            {
+                foreach (var feature in requiredFeatures)
+                {
+                    query = query.Where(c => c.Features != null && c.Features.Contains(feature));
+                }
+            }
+
+            var chunks = await query.ToListAsync(cancellationToken);
 
             var results = chunks
                 .Select(chunk =>
@@ -129,7 +155,10 @@ public class ChunkRepository : IChunkRepository
     {
         try
         {
-            var deleted = await _dbContext.DeleteByFilePathAsync(filePath, cancellationToken);
+            var deleted = await _dbContext.Chunks
+                .Where(c => c.FilePath == filePath)
+                .ExecuteDeleteAsync(cancellationToken);
+
             return deleted > 0;
         }
         catch (Exception ex)
@@ -144,7 +173,8 @@ public class ChunkRepository : IChunkRepository
         string hash,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.HasContentHashAsync(filePath, hash, cancellationToken);
+        return await _dbContext.Chunks
+            .AnyAsync(c => c.FilePath == filePath && c.ContentHash == hash, cancellationToken);
     }
 
     public async Task<Result<List<SearchResultItem>, GrigoriError>> GetChunksByIdsAsync(
@@ -158,18 +188,21 @@ public class ChunkRepository : IChunkRepository
 
         try
         {
-            var chunks = await _dbContext.GetChunksByIdsAsync(ids, cancellationToken);
-
-            var results = chunks.Select(chunk => new SearchResultItem
-            {
-                Id = chunk.Id,
-                FilePath = chunk.FilePath,
-                StartLine = chunk.StartLine,
-                EndLine = chunk.EndLine,
-                Content = chunk.Content,
-                Score = 0f, // Score will be set by caller based on HNSW distance
-                Features = chunk.Features?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() ?? []
-            }).ToList();
+            var results = await _dbContext.Chunks
+                .Where(c => ids.Contains(c.Id))
+                .Select(c => new SearchResultItem
+                {
+                    Id = c.Id,
+                    FilePath = c.FilePath,
+                    StartLine = c.StartLine,
+                    EndLine = c.EndLine,
+                    Content = c.Content,
+                    Score = 0f,
+                    Features = c.Features != null
+                        ? c.Features.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
+                        : new List<string>()
+                })
+                .ToListAsync(cancellationToken);
 
             return results;
         }
@@ -183,9 +216,11 @@ public class ChunkRepository : IChunkRepository
     public async Task<IEnumerable<(long Id, float[] Embedding)>> GetAllEmbeddingsAsync(
         CancellationToken cancellationToken = default)
     {
-        var chunks = await _dbContext.GetAllChunksAsync(cancellationToken);
+        var chunks = await _dbContext.Chunks
+            .Select(c => new { c.Id, c.Embedding })
+            .ToListAsync(cancellationToken);
 
-        return chunks.Select(chunk => (chunk.Id, DeserializeEmbedding(chunk.Embedding)));
+        return chunks.Select(c => (c.Id, DeserializeEmbedding(c.Embedding)));
     }
 
     public async Task<Result<List<ChunkForLexicalSearch>, GrigoriError>> GetChunksForLexicalSearchAsync(
@@ -194,17 +229,26 @@ public class ChunkRepository : IChunkRepository
     {
         try
         {
-            var chunks = await _dbContext.GetChunksForLexicalSearchAsync(fileExtensions, cancellationToken);
+            var query = _dbContext.Chunks.AsQueryable();
 
-            var results = chunks.Select(chunk => new ChunkForLexicalSearch
+            if (fileExtensions is { Count: > 0 })
             {
-                Id = chunk.Id,
-                FilePath = chunk.FilePath,
-                StartLine = chunk.StartLine,
-                EndLine = chunk.EndLine,
-                Content = chunk.Content,
-                Features = chunk.Features?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() ?? []
-            }).ToList();
+                query = query.Where(c => fileExtensions.Any(ext => c.FilePath.EndsWith(ext)));
+            }
+
+            var results = await query
+                .Select(c => new ChunkForLexicalSearch
+                {
+                    Id = c.Id,
+                    FilePath = c.FilePath,
+                    StartLine = c.StartLine,
+                    EndLine = c.EndLine,
+                    Content = c.Content,
+                    Features = c.Features != null
+                        ? c.Features.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
+                        : new List<string>()
+                })
+                .ToListAsync(cancellationToken);
 
             return results;
         }
@@ -222,7 +266,6 @@ public class ChunkRepository : IChunkRepository
             return QuantizeToInt8(embedding);
         }
 
-        // Float32 serialization
         var bytes = new byte[embedding.Length * sizeof(float)];
         Buffer.BlockCopy(embedding, 0, bytes, 0, bytes.Length);
         return bytes;
@@ -230,10 +273,6 @@ public class ChunkRepository : IChunkRepository
 
     private float[] DeserializeEmbedding(byte[] bytes)
     {
-        // Detect format by size
-        // Int8 format: 8 header bytes + N quantized bytes
-        // Float32 format: N * 4 bytes
-
         var isFloat32 = IsFloat32Format(bytes);
 
         if (isFloat32)
@@ -248,7 +287,6 @@ public class ChunkRepository : IChunkRepository
 
     private static bool IsFloat32Format(byte[] bytes)
     {
-        // Common embedding dimensions for float32
         int[] commonDimensions = [384, 768, 1024, 1536];
         var floatCount = bytes.Length / sizeof(float);
         return Array.Exists(commonDimensions, d => d == floatCount);
@@ -261,7 +299,7 @@ public class ChunkRepository : IChunkRepository
         var scale = (max - min) / 255f;
         var zeroPoint = -min / scale;
 
-        var bytes = new byte[8 + embedding.Length]; // 4 bytes scale + 4 bytes zeroPoint + quantized
+        var bytes = new byte[8 + embedding.Length];
         BitConverter.GetBytes(scale).CopyTo(bytes, 0);
         BitConverter.GetBytes(zeroPoint).CopyTo(bytes, 4);
 
