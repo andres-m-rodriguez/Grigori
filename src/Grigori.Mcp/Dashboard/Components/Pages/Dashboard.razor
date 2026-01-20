@@ -1,4 +1,5 @@
 @page "/dashboard"
+@using Grigori.Contracts.Dtos.Dashboard
 @using Grigori.Contracts.Dtos.Metrics
 @inject DashboardService DashboardService
 
@@ -33,9 +34,9 @@ else if (_stats != null)
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Elevation="1" Class="pa-4">
-                <MudText Typo="Typo.overline">HNSW Index</MudText>
-                <MudText Typo="Typo.h4" Color="@(_stats.HnswBuilt ? Color.Success : Color.Warning)">
-                    @(_stats.HnswBuilt ? "Active" : "Inactive")
+                <MudText Typo="Typo.overline">Vector Index</MudText>
+                <MudText Typo="Typo.h4" Color="@(_stats.VectorIndexEnabled ? Color.Success : Color.Warning)">
+                    @(_stats.VectorIndexEnabled ? "Active" : "Inactive")
                 </MudText>
             </MudPaper>
         </MudItem>
@@ -50,10 +51,10 @@ else if (_stats != null)
                 </MudText>
             </div>
             <div>
-                @if (_stats.HnswBuilt)
+                @if (_stats.VectorIndexEnabled)
                 {
                     <MudChip T="string" Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small">
-                        HNSW: @_stats.HnswVectorCount.ToString("N0") vectors
+                        pgvector: @_stats.VectorCount.ToString("N0") vectors
                     </MudChip>
                 }
                 else
@@ -210,8 +211,8 @@ else
 }
 
 @code {
-    private IndexStats? _stats;
-    private List<IndexedProject> _projects = [];
+    private IndexStatsDto? _stats;
+    private List<IndexedProjectDto> _projects = [];
     private List<ActivityLogDto> _activityLogs = [];
     private List<SearchHistoryDto> _searchHistory = [];
     private List<PerformanceDataPointDto> _performanceData = [];

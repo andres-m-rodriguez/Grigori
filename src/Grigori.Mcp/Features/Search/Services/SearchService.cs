@@ -6,7 +6,6 @@ using Grigori.Contracts.Interfaces;
 using Grigori.Contracts.Options;
 using Grigori.Contracts.Results;
 using Grigori.Infrastructure.Chunking;
-using Grigori.Infrastructure.Indexing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -17,7 +16,6 @@ public class SearchService : ISearchService
     private readonly IChunkRepository _chunkRepository;
     private readonly IEmbeddingProvider _embeddingProvider;
     private readonly IMetricsService _metricsService;
-    private readonly HnswIndex _hnswIndex;
     private readonly GrigoriOptions _options;
     private readonly ILogger<SearchService> _logger;
 
@@ -35,14 +33,12 @@ public class SearchService : ISearchService
         IChunkRepository chunkRepository,
         IEmbeddingProvider embeddingProvider,
         IMetricsService metricsService,
-        HnswIndex hnswIndex,
         IOptions<GrigoriOptions> options,
         ILogger<SearchService> logger)
     {
         _chunkRepository = chunkRepository;
         _embeddingProvider = embeddingProvider;
         _metricsService = metricsService;
-        _hnswIndex = hnswIndex;
         _options = options.Value;
         _logger = logger;
     }
@@ -79,7 +75,6 @@ public class SearchService : ISearchService
             }
 
             List<SearchResultItem> finalResults;
-            var usedHnsw = false;
 
             if (searchMode == "lexical")
             {
@@ -91,12 +86,11 @@ public class SearchService : ISearchService
             }
             else if (searchMode == "semantic")
             {
-                // Pure semantic search (with HNSW if available)
+                // Pure semantic search using pgvector
                 var semanticResult = await PerformSemanticSearchAsync(request.Query, request.Limit, fileExtensions, cancellationToken);
                 if (semanticResult.IsFailure)
                     return semanticResult.Error;
-                finalResults = semanticResult.Value.Results;
-                usedHnsw = semanticResult.Value.UsedHnsw;
+                finalResults = semanticResult.Value;
             }
             else
             {
@@ -104,12 +98,12 @@ public class SearchService : ISearchService
                 var hybridResult = await PerformHybridSearchAsync(request.Query, request.Limit, fileExtensions, cancellationToken);
                 if (hybridResult.IsFailure)
                     return hybridResult.Error;
-                finalResults = hybridResult.Value.Results;
-                usedHnsw = hybridResult.Value.UsedHnsw;
+                finalResults = hybridResult.Value;
             }
 
             stopwatch.Stop();
-            await _metricsService.RecordSearchAsync(request.Query, stopwatch.ElapsedMilliseconds, finalResults.Count, cacheHit, usedHnsw, cancellationToken);
+            // usedPgvector is always true now since we use PostgreSQL for vector search
+            await _metricsService.RecordSearchAsync(request.Query, stopwatch.ElapsedMilliseconds, finalResults.Count, cacheHit, usedPgvector: true, cancellationToken);
 
             // Format results based on output mode
             var formattedResults = FormatResults(finalResults, request.OutputMode);
@@ -130,27 +124,21 @@ public class SearchService : ISearchService
 
             var tokenEstimate = json.Length / 4;
 
-            return new SearchResultDto
-            {
-                Success = true,
-                Count = finalResults.Count,
-                Results = finalResults.Select(r => new CodeChunkDto
-                {
-                    FilePath = r.FilePath,
-                    StartLine = r.StartLine,
-                    EndLine = r.EndLine,
-                    Content = FormatContent(r.Content, request.OutputMode),
-                    Score = r.Score
-                }).ToList(),
-                Metrics = new SearchMetricsDto
-                {
-                    DurationMs = stopwatch.ElapsedMilliseconds,
-                    CacheHit = cacheHit,
-                    OutputMode = request.OutputMode,
-                    TokenEstimate = tokenEstimate,
-                    SearchMode = searchMode
-                }
-            };
+            return new SearchResultDto(
+                true,
+                finalResults.Count,
+                finalResults.Select(r => new CodeChunkDto(
+                    r.FilePath,
+                    r.StartLine,
+                    r.EndLine,
+                    FormatContent(r.Content, request.OutputMode),
+                    r.Score)).ToList(),
+                new SearchMetricsDto(
+                    stopwatch.ElapsedMilliseconds,
+                    cacheHit,
+                    request.OutputMode,
+                    tokenEstimate,
+                    searchMode));
         }
         catch (Exception ex)
         {
@@ -159,9 +147,7 @@ public class SearchService : ISearchService
         }
     }
 
-    private record SemanticSearchResult(List<SearchResultItem> Results, bool UsedHnsw);
-
-    private async Task<Result<SemanticSearchResult, GrigoriError>> PerformSemanticSearchAsync(
+    private async Task<Result<List<SearchResultItem>, GrigoriError>> PerformSemanticSearchAsync(
         string query,
         int limit,
         List<string>? fileExtensions,
@@ -175,61 +161,19 @@ public class SearchService : ISearchService
         var queryEmbedding = embeddingResult.Value;
         var queryFeatures = FeatureExtractor.ExtractFeaturesFromQuery(query);
 
-        var usedHnsw = false;
-        List<SearchResultItem> results;
+        // Use pgvector for similarity search via the repository
+        var searchResult = await _chunkRepository.SearchAsync(
+            queryEmbedding,
+            limit * 2,
+            DefaultScoreThreshold,
+            requiredFeatures: null,
+            fileExtensions: fileExtensions,
+            cancellationToken);
 
-        // Try HNSW search first if enabled and index is built
-        if (_options.Hnsw.Enabled && _hnswIndex.IsBuilt && fileExtensions == null)
-        {
-            // Use HNSW for approximate nearest neighbor search
-            var hnswResults = _hnswIndex.Search(queryEmbedding, limit * 2);
+        if (searchResult.IsFailure)
+            return searchResult.Error;
 
-            if (hnswResults.Count > 0)
-            {
-                usedHnsw = true;
-                var candidateIds = hnswResults
-                    .Where(r => HnswIndex.DistanceToSimilarity(r.Distance) >= DefaultScoreThreshold)
-                    .Select(r => r.Id)
-                    .ToList();
-
-                var chunksResult = await _chunkRepository.GetChunksByIdsAsync(candidateIds, cancellationToken);
-                if (chunksResult.IsFailure)
-                    return chunksResult.Error;
-
-                // Create a lookup for HNSW distances
-                var distanceLookup = hnswResults.ToDictionary(r => r.Id, r => r.Distance);
-
-                // Set scores from HNSW distances
-                results = chunksResult.Value.Select(r => r with
-                {
-                    Score = distanceLookup.TryGetValue(r.Id, out var distance)
-                        ? HnswIndex.DistanceToSimilarity(distance)
-                        : r.Score
-                }).ToList();
-
-                _logger.LogDebug("HNSW search returned {Count} results", results.Count);
-            }
-            else
-            {
-                results = [];
-            }
-        }
-        else
-        {
-            // Fall back to linear scan (required when filtering by file extensions)
-            var searchResult = await _chunkRepository.SearchAsync(
-                queryEmbedding,
-                limit * 2,
-                DefaultScoreThreshold,
-                requiredFeatures: null,
-                fileExtensions: fileExtensions,
-                cancellationToken);
-
-            if (searchResult.IsFailure)
-                return searchResult.Error;
-
-            results = searchResult.Value;
-        }
+        var results = searchResult.Value;
 
         // Apply feature boosting
         if (queryFeatures.Count > 0)
@@ -243,7 +187,7 @@ public class SearchService : ISearchService
             .Take(limit)
             .ToList();
 
-        return new SemanticSearchResult(finalResults, usedHnsw);
+        return finalResults;
     }
 
     private async Task<Result<List<SearchResultItem>, GrigoriError>> PerformLexicalSearchAsync(
@@ -296,7 +240,7 @@ public class SearchService : ISearchService
         return results;
     }
 
-    private async Task<Result<SemanticSearchResult, GrigoriError>> PerformHybridSearchAsync(
+    private async Task<Result<List<SearchResultItem>, GrigoriError>> PerformHybridSearchAsync(
         string query,
         int limit,
         List<string>? fileExtensions,
@@ -314,24 +258,21 @@ public class SearchService : ISearchService
         if (semanticResult.IsFailure && lexicalResult.IsFailure)
             return semanticResult.Error;
 
-        var semanticSearchResult = semanticResult.IsSuccess ? semanticResult.Value : new SemanticSearchResult([], false);
-        var semanticResults = semanticSearchResult.Results;
+        var semanticResults = semanticResult.IsSuccess ? semanticResult.Value : [];
         var lexicalResults = lexicalResult.IsSuccess ? lexicalResult.Value : [];
-        var usedHnsw = semanticSearchResult.UsedHnsw;
 
         _logger.LogDebug(
-            "Hybrid search: {SemanticCount} semantic results, {LexicalCount} lexical results, usedHnsw: {UsedHnsw}",
+            "Hybrid search: {SemanticCount} semantic results, {LexicalCount} lexical results",
             semanticResults.Count,
-            lexicalResults.Count,
-            usedHnsw);
+            lexicalResults.Count);
 
         // If only one search type returned results, use that
         if (semanticResults.Count == 0 && lexicalResults.Count > 0)
-            return new SemanticSearchResult(lexicalResults.Take(limit).ToList(), usedHnsw);
+            return lexicalResults.Take(limit).ToList();
         if (lexicalResults.Count == 0 && semanticResults.Count > 0)
-            return new SemanticSearchResult(semanticResults.Take(limit).ToList(), usedHnsw);
+            return semanticResults.Take(limit).ToList();
         if (semanticResults.Count == 0 && lexicalResults.Count == 0)
-            return new SemanticSearchResult([], usedHnsw);
+            return new List<SearchResultItem>();
 
         // Fuse results using RRF
         var fusedResults = ReciprocalRankFusion.FuseWithScores(
@@ -361,7 +302,7 @@ public class SearchService : ISearchService
             })
             .ToList();
 
-        return new SemanticSearchResult(finalResults, usedHnsw);
+        return finalResults;
     }
 
     private Task RefreshBm25ScorerIfNeededAsync(List<ChunkForLexicalSearch> chunks, CancellationToken cancellationToken)

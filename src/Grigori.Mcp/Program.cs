@@ -5,7 +5,6 @@ using Grigori.Database;
 using Grigori.Database.Extensions;
 using Grigori.DataAccess.Extensions;
 using Grigori.Infrastructure.Extensions;
-using Grigori.Infrastructure.Indexing;
 using Grigori.Mcp.Dashboard.Components;
 using Grigori.Mcp.Dashboard.Services;
 using Grigori.Mcp.Features.Benchmark.Endpoints;
@@ -15,6 +14,7 @@ using Grigori.Mcp.Features.Index.Services;
 using Grigori.Mcp.Features.Metrics.Endpoints;
 using Grigori.Mcp.Features.Search.Endpoints;
 using Grigori.Mcp.Features.Search.Services;
+using Microsoft.EntityFrameworkCore;
 using ModelContextProtocol.Server;
 using MudBlazor.Services;
 
@@ -50,6 +50,7 @@ if (!mcpMode && !mcpHttpMode && !dashboardOnly)
 // Add configuration
 var projectDir = AppContext.BaseDirectory;
 builder.Configuration.AddJsonFile(Path.Combine(projectDir, "appsettings.json"), optional: true);
+builder.Configuration.AddEnvironmentVariables();
 
 // Configure options
 builder.Services.Configure<GrigoriOptions>(builder.Configuration.GetSection(GrigoriOptions.SectionName));
@@ -113,7 +114,14 @@ else if (serverMode || mcpHttpMode)
 
 var app = builder.Build();
 
-// Eagerly initialize embedding provider to start background model loading
+// Ensure database is created and migrated
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<GrigoriDbContext>();
+    await dbContext.Database.EnsureCreatedAsync();
+}
+
+// Eagerly initialize embedding provider to start background connection
 // This triggers registration with the dependency tracker
 _ = app.Services.GetRequiredService<IEmbeddingProvider>();
 
@@ -147,13 +155,11 @@ app.MapGet("/api/status", (IMetricsService metrics) =>
 // Search API
 app.MapPost("/api/search", async (SearchRequest request, ISearchService searchService, CancellationToken ct) =>
 {
-    var result = await searchService.SearchAsync(new Grigori.Contracts.Dtos.Search.SearchRequestDto
-    {
-        Query = request.Query,
-        Limit = request.Limit ?? 10,
-        FileTypes = request.FileTypes,
-        OutputMode = request.OutputMode ?? "full"
-    }, ct);
+    var result = await searchService.SearchAsync(new Grigori.Contracts.Dtos.Search.SearchRequestDto(
+        request.Query,
+        request.Limit ?? 10,
+        request.OutputMode ?? "full",
+        request.FileTypes), ct);
 
     return result.Match(
         success => Results.Ok(success),
@@ -167,7 +173,7 @@ app.MapPost("/api/index", async (IndexRequest request, IIndexService indexServic
     if (string.IsNullOrEmpty(request.Path))
         return Results.BadRequest(new { error = "Path is required" });
 
-    var result = await indexService.IndexDirectoryAsync(new IndexRequestDto { Path = request.Path }, ct);
+    var result = await indexService.IndexDirectoryAsync(new IndexRequestDto(request.Path), ct);
 
     return result.Match(
         success => Results.Ok(success),
@@ -201,11 +207,7 @@ app.MapPost("/api/index/files", async Task<IResult> (IndexFilesRequest request, 
         }
 
         // Index the temp directory, passing project name so paths are stored correctly
-        var result = await indexService.IndexDirectoryAsync(new IndexRequestDto
-        {
-            Path = tempDir,
-            ProjectName = request.ProjectName
-        }, ct);
+        var result = await indexService.IndexDirectoryAsync(new IndexRequestDto(tempDir, request.ProjectName), ct);
 
         return result.Match(
             success => Results.Ok(success),

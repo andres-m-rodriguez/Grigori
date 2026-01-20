@@ -4,9 +4,11 @@ public class GrigoriOptions
 {
     public const string SectionName = "Grigori";
 
-    public string EmbeddingProvider { get; set; } = "onnx";
+    public string EmbeddingProvider { get; set; } = "grpc";
     public OnnxOptions Onnx { get; set; } = new();
     public VoyageOptions Voyage { get; set; } = new();
+    public EmbeddingServiceOptions EmbeddingService { get; set; } = new();
+    public DatabaseOptions Database { get; set; } = new();
     public string IndexPath { get; set; } = "./grigori.db";
     public List<string> WatchedDirectories { get; set; } = [];
     public List<string> FileExtensions { get; set; } = [".cs", ".ts", ".js", ".py", ".go", ".rs", ".java", ".tsx", ".jsx"];
@@ -57,4 +59,14 @@ public enum QuantizationMode
 {
     None,
     Int8
+}
+
+public class DatabaseOptions
+{
+    public string ConnectionString { get; set; } = "Host=localhost;Database=grigori;Username=grigori;Password=grigori";
+}
+
+public class EmbeddingServiceOptions
+{
+    public string Address { get; set; } = "http://localhost:50051";
 }

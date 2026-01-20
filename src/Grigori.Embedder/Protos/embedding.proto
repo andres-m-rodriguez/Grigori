@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+option csharp_namespace = "Grigori.Embedder";
+
+package embedding;
+
+// The embedding service for generating text embeddings
+service EmbeddingService {
+  // Generate embedding for a single text
+  rpc GetEmbedding (EmbeddingRequest) returns (EmbeddingResponse);
+
+  // Generate embeddings for multiple texts in batch
+  rpc GetEmbeddings (BatchEmbeddingRequest) returns (BatchEmbeddingResponse);
+
+  // Check if the service is ready
+  rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+enum InputType {
+  DOCUMENT = 0;
+  QUERY = 1;
+}
+
+message EmbeddingRequest {
+  string text = 1;
+  InputType input_type = 2;
+}
+
+message EmbeddingResponse {
+  repeated float embedding = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message BatchEmbeddingRequest {
+  repeated string texts = 1;
+  InputType input_type = 2;
+}
+
+message BatchEmbeddingResponse {
+  repeated EmbeddingVector embeddings = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message EmbeddingVector {
+  repeated float values = 1;
+}
+
+message HealthCheckRequest {
+}
+
+message HealthCheckResponse {
+  bool ready = 1;
+  string status = 2;
+}

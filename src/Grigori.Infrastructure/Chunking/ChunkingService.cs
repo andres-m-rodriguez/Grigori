@@ -1,5 +1,5 @@
 using Grigori.Contracts.Interfaces;
-using Grigori.Database;
+using Grigori.Contracts.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Grigori.Infrastructure.Chunking;
@@ -46,7 +46,7 @@ public class ChunkingService
         return chunk with
         {
             Content = contextPrefix + chunk.Content,
-            ContentHash = GrigoriDbContext.ComputeHash(chunk.Content),
+            ContentHash = ContentHasher.ComputeHash(chunk.Content),
             Features = features
         };
     }

@@ -1,0 +1,86 @@
+# =============================================================================
+# Grigori Embedding Service - Dockerfile
+# =============================================================================
+# Builds the gRPC embedding service with ONNX model
+#
+# Usage:
+#   docker build -f Dockerfile.embedder -t grigori-embedder .
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build
+# -----------------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+
+WORKDIR /src
+
+# Copy solution and project files
+COPY Grigori.slnx ./
+COPY src/Grigori.Embedder/Grigori.Embedder.csproj src/Grigori.Embedder/
+
+# Restore dependencies
+RUN dotnet restore src/Grigori.Embedder/Grigori.Embedder.csproj
+
+# Copy source code
+COPY src/Grigori.Embedder/ src/Grigori.Embedder/
+
+# Build and publish
+RUN dotnet publish src/Grigori.Embedder/Grigori.Embedder.csproj \
+    -c Release \
+    -o /app/publish \
+    -p:SelfContained=false \
+    -p:PublishSingleFile=false
+
+# -----------------------------------------------------------------------------
+# Stage 2: Download Model
+# -----------------------------------------------------------------------------
+FROM alpine:3.19 AS model-downloader
+
+RUN apk add --no-cache curl
+
+WORKDIR /models
+
+# Download all-MiniLM-L6-v2 ONNX model and vocab
+RUN curl -L -o model.onnx \
+    "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx" && \
+    curl -L -o vocab.txt \
+    "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/vocab.txt" && \
+    echo "Model size: $(du -h model.onnx | cut -f1)" && \
+    echo "Vocab size: $(du -h vocab.txt | cut -f1)"
+
+# -----------------------------------------------------------------------------
+# Stage 3: Runtime
+# -----------------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+
+# Install native dependencies for ONNX Runtime and health check
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
+RUN groupadd -r grigori && useradd -r -g grigori -m -d /home/grigori grigori
+
+# Set up directories
+WORKDIR /app
+RUN mkdir -p /data/models && \
+    chown -R grigori:grigori /app /data /home/grigori
+
+# Copy published app
+COPY --from=build --chown=grigori:grigori /app/publish /app
+
+# Copy pre-downloaded model
+COPY --from=model-downloader --chown=grigori:grigori /models/model.onnx /data/models/model.onnx
+COPY --from=model-downloader --chown=grigori:grigori /models/vocab.txt /data/models/vocab.txt
+
+# Environment configuration
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    Embedder__ModelPath=/data/models/model.onnx \
+    Embedder__VocabPath=/data/models/vocab.txt
+
+EXPOSE 50051
+
+USER grigori
+
+ENTRYPOINT ["dotnet", "/app/Grigori.Embedder.dll"]

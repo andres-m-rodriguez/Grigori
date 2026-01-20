@@ -49,14 +49,7 @@ public class SearchEndpoints
         _logger.LogInformation("Searching for: {Query} (limit: {Limit}, mode: {Mode}, searchMode: {SearchMode}, fileTypes: {FileTypes})",
             query, limit, mode, search, fileTypes ?? "all");
 
-        var request = new SearchRequestDto
-        {
-            Query = query,
-            Limit = limit,
-            OutputMode = mode,
-            FileTypes = fileTypes,
-            SearchMode = search
-        };
+        var request = new SearchRequestDto(query, limit, mode, fileTypes, search);
 
         var result = await _searchService.SearchAsync(request, cancellationToken);
 
