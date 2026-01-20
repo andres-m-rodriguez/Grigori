@@ -20,8 +20,8 @@ public static class ServiceCollectionExtensions
         // Dependency tracking (singleton, must be registered first)
         services.AddSingleton<IDependencyTracker, DependencyTracker>();
 
-        // Metrics (scoped to match repository lifetime)
-        services.AddScoped<IMetricsService, MetricsService>();
+        // Metrics (singleton for thread-safe metrics tracking)
+        services.AddSingleton<IMetricsService, MetricsService>();
 
         // Chunking
         services.AddSingleton<ILanguageChunker, CSharpChunker>();
@@ -30,10 +30,10 @@ public static class ServiceCollectionExtensions
         // File watching
         services.AddSingleton<FileWatcher>();
 
-        // GitHub integration (GitHubService singleton for token state, IndexingService scoped for repository access)
+        // GitHub integration (singleton for token state management)
         services.AddHttpClient("GitHub");
         services.AddSingleton<IGitHubService, GitHubService>();
-        services.AddScoped<IGitHubIndexingService, GitHubIndexingService>();
+        services.AddSingleton<IGitHubIndexingService, GitHubIndexingService>();
 
         // Note: HNSW index removed - using pgvector for vector similarity search
 
@@ -52,10 +52,10 @@ public static class ServiceCollectionExtensions
             };
         });
 
-        // Feature services (scoped to match repository lifetime)
-        services.AddScoped<ISearchService, SearchService>();
-        services.AddScoped<IIndexService, IndexService>();
-        services.AddScoped<BenchmarkService>();
+        // Feature services
+        services.AddSingleton<ISearchService, SearchService>();
+        services.AddSingleton<IIndexService, IndexService>();
+        services.AddSingleton<BenchmarkService>();
 
         return services;
     }
