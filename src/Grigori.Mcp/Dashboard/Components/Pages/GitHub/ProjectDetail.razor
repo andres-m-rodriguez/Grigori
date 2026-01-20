@@ -1,0 +1,235 @@
+@page "/github/projects/{Owner}/{Repo}"
+@using Grigori.Contracts.Dtos.GitHub
+
+<PageTitle>@Owner/@Repo - Grigori</PageTitle>
+
+<GitHubAuthRequired FeatureDescription="Connect your GitHub account to view project details.">
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_repository == null)
+    {
+        <MudAlert Severity="Severity.Error">
+            Repository not found or you don't have access to it.
+        </MudAlert>
+    }
+    else
+    {
+        <MudStack Spacing="4">
+            @* Header *@
+            <MudPaper Elevation="1" Class="pa-4">
+                <MudStack Row="true" AlignItems="AlignItems.Start" Justify="Justify.SpaceBetween">
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                                           Size="Size.Small"
+                                           OnClick="NavigateBack" />
+                            <MudIcon Icon="@(_repository.IsPrivate ? Icons.Material.Filled.Lock : Icons.Material.Filled.Public)"
+                                     Color="@(_repository.IsPrivate ? Color.Warning : Color.Info)" />
+                            <MudText Typo="Typo.h5">@_repository.FullName</MudText>
+                        </MudStack>
+                        @if (!string.IsNullOrEmpty(_repository.Description))
+                        {
+                            <MudText Typo="Typo.body1" Color="Color.Secondary">
+                                @_repository.Description
+                            </MudText>
+                        }
+                    </MudStack>
+                    <MudStack Row="true" Spacing="2">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Star">
+                            @_repository.StarCount.ToString("N0")
+                        </MudChip>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.CallSplit">
+                            @_repository.ForkCount.ToString("N0")
+                        </MudChip>
+                        @if (!string.IsNullOrEmpty(_repository.Language))
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                                @_repository.Language
+                            </MudChip>
+                        }
+                        <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                       Size="Size.Small"
+                                       Href="@_repository.HtmlUrl"
+                                       Target="_blank" />
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+
+            @* Tabs *@
+            <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+                <MudTabPanel Text="Activity" Icon="@Icons.Material.Filled.Timeline">
+                    @if (_loadingActivity)
+                    {
+                        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                    }
+                    else
+                    {
+                        <MudGrid Spacing="3">
+                            @* Recent Commits *@
+                            <MudItem xs="12" md="6">
+                                <MudText Typo="Typo.h6" Class="mb-3">Recent Commits</MudText>
+                                @if (_commits.Count == 0)
+                                {
+                                    <MudAlert Severity="Severity.Info" Dense="true">No recent commits found.</MudAlert>
+                                }
+                                else
+                                {
+                                    <MudList T="string" Dense="true">
+                                        @foreach (var commit in _commits.Take(10))
+                                        {
+                                            <MudListItem T="string">
+                                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                    @if (!string.IsNullOrEmpty(commit.AuthorAvatarUrl))
+                                                    {
+                                                        <MudAvatar Size="Size.Small">
+                                                            <MudImage Src="@commit.AuthorAvatarUrl" Alt="@commit.AuthorName" />
+                                                        </MudAvatar>
+                                                    }
+                                                    else
+                                                    {
+                                                        <MudAvatar Size="Size.Small" Color="Color.Primary">
+                                                            @(commit.AuthorName?[0] ?? '?')
+                                                        </MudAvatar>
+                                                    }
+                                                    <MudStack Spacing="0" Style="flex: 1; min-width: 0;">
+                                                        <MudLink Href="@commit.HtmlUrl" Target="_blank" Typo="Typo.body2">
+                                                            @commit.ShortMessage
+                                                        </MudLink>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            @commit.AuthorName · @FormatDate(commit.CommittedAt)
+                                                        </MudText>
+                                                    </MudStack>
+                                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default">
+                                                        @commit.ShortSha
+                                                    </MudChip>
+                                                </MudStack>
+                                            </MudListItem>
+                                            <MudDivider />
+                                        }
+                                    </MudList>
+                                }
+                            </MudItem>
+
+                            @* Pull Requests *@
+                            <MudItem xs="12" md="6">
+                                <MudText Typo="Typo.h6" Class="mb-3">Pull Requests</MudText>
+                                @if (_pullRequests.Count == 0)
+                                {
+                                    <MudAlert Severity="Severity.Info" Dense="true">No open pull requests.</MudAlert>
+                                }
+                                else
+                                {
+                                    <MudList T="string" Dense="true">
+                                        @foreach (var pr in _pullRequests.Take(10))
+                                        {
+                                            <MudListItem T="string">
+                                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.MergeType"
+                                                             Color="@GetPrStateColor(pr)" Size="Size.Small" />
+                                                    <MudStack Spacing="0" Style="flex: 1; min-width: 0;">
+                                                        <MudLink Href="@pr.HtmlUrl" Target="_blank" Typo="Typo.body2">
+                                                            @pr.Title
+                                                        </MudLink>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            #@pr.Number by @pr.AuthorLogin · @FormatDate(pr.CreatedAt)
+                                                        </MudText>
+                                                    </MudStack>
+                                                    @if (pr.IsDraft)
+                                                    {
+                                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default">
+                                                            Draft
+                                                        </MudChip>
+                                                    }
+                                                </MudStack>
+                                            </MudListItem>
+                                            <MudDivider />
+                                        }
+                                    </MudList>
+                                }
+                            </MudItem>
+
+                            @* Branches *@
+                            <MudItem xs="12">
+                                <MudText Typo="Typo.h6" Class="mb-3">Branches (@_branches.Count)</MudText>
+                                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                                    @foreach (var branch in _branches.Take(20))
+                                    {
+                                        <MudChip T="string"
+                                                 Size="Size.Small"
+                                                 Variant="@(branch.IsDefault ? Variant.Filled : Variant.Outlined)"
+                                                 Color="@(branch.IsDefault ? Color.Primary : Color.Default)"
+                                                 Icon="@(branch.IsProtected ? Icons.Material.Filled.Shield : null)">
+                                            @branch.Name
+                                        </MudChip>
+                                    }
+                                    @if (_branches.Count > 20)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary">
+                                            +@(_branches.Count - 20) more
+                                        </MudChip>
+                                    }
+                                </MudStack>
+                            </MudItem>
+                        </MudGrid>
+                    }
+                </MudTabPanel>
+
+                <MudTabPanel Text="Hot Spots" Icon="@Icons.Material.Filled.Whatshot">
+                    <MudAlert Severity="Severity.Info" Class="mb-4">
+                        Hot Spots analysis shows the most frequently changed files in your repository.
+                    </MudAlert>
+                    <MudText Typo="Typo.body1" Color="Color.Secondary">
+                        Hot Spots analysis coming soon. This will show files that are changed most frequently,
+                        helping identify areas of high churn that may benefit from refactoring.
+                    </MudText>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Pulse" Icon="@Icons.Material.Filled.MonitorHeart">
+                    <MudAlert Severity="Severity.Info" Class="mb-4">
+                        Project Pulse provides health and activity indicators for your repository.
+                    </MudAlert>
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudPaper Elevation="0" Class="pa-4">
+                                <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                                    <MudIcon Icon="@Icons.Material.Filled.Commit" Size="Size.Large" Color="Color.Primary" />
+                                    <MudText Typo="Typo.h4">@_commits.Count</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Recent Commits</MudText>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudPaper Elevation="0" Class="pa-4">
+                                <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                                    <MudIcon Icon="@Icons.Material.Filled.MergeType" Size="Size.Large" Color="Color.Success" />
+                                    <MudText Typo="Typo.h4">@_pullRequests.Count</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Open PRs</MudText>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudPaper Elevation="0" Class="pa-4">
+                                <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                                    <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Large" Color="Color.Warning" />
+                                    <MudText Typo="Typo.h4">@_branches.Count</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Branches</MudText>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudPaper Elevation="0" Class="pa-4">
+                                <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                                    <MudIcon Icon="@Icons.Material.Filled.BugReport" Size="Size.Large" Color="Color.Error" />
+                                    <MudText Typo="Typo.h4">@_repository.OpenIssuesCount</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Open Issues</MudText>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+            </MudTabs>
+        </MudStack>
+    }
+</GitHubAuthRequired>
