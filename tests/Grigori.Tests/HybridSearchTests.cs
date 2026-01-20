@@ -3,7 +3,6 @@ using Grigori.Contracts.Dtos.Search;
 using Grigori.Contracts.Interfaces;
 using Grigori.Contracts.Options;
 using Grigori.Contracts.Results;
-using Grigori.Infrastructure.Indexing;
 using Grigori.Mcp.Features.Search.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,7 +20,6 @@ public class HybridSearchTests
     private readonly Mock<IChunkRepository> _mockChunkRepository;
     private readonly Mock<IEmbeddingProvider> _mockEmbeddingProvider;
     private readonly Mock<IMetricsService> _mockMetricsService;
-    private readonly HnswIndex _hnswIndex;
     private readonly IOptions<GrigoriOptions> _options;
     private readonly SearchService _searchService;
 
@@ -31,14 +29,7 @@ public class HybridSearchTests
         _mockEmbeddingProvider = new Mock<IEmbeddingProvider>();
         _mockMetricsService = new Mock<IMetricsService>();
 
-        // Create a real HnswIndex but with HNSW disabled via options
-        _hnswIndex = new HnswIndex(NullLogger<HnswIndex>.Instance);
-
-        // Disable HNSW so tests use the repository path
-        _options = Options.Create(new GrigoriOptions
-        {
-            Hnsw = new HnswOptions { Enabled = false }
-        });
+        _options = Options.Create(new GrigoriOptions());
 
         // Setup default metrics mock
         _mockMetricsService
@@ -51,7 +42,6 @@ public class HybridSearchTests
             _mockChunkRepository.Object,
             _mockEmbeddingProvider.Object,
             _mockMetricsService.Object,
-            _hnswIndex,
             _options,
             NullLogger<SearchService>.Instance);
     }

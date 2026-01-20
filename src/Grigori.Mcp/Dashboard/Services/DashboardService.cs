@@ -2,7 +2,7 @@ using Grigori.Contracts.Dtos.Metrics;
 using Grigori.Contracts.Dtos.Search;
 using Grigori.Contracts.Interfaces;
 using Grigori.Database;
-using Grigori.Infrastructure.Indexing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Grigori.Mcp.Dashboard.Services;
@@ -10,7 +10,6 @@ namespace Grigori.Mcp.Dashboard.Services;
 public class DashboardService
 {
     private readonly GrigoriDbContext _dbContext;
-    private readonly HnswIndex _hnswIndex;
     private readonly IServiceProvider _serviceProvider;
 
     // Lazy-load services to avoid blocking page render
@@ -20,41 +19,35 @@ public class DashboardService
 
     public DashboardService(
         GrigoriDbContext dbContext,
-        HnswIndex hnswIndex,
         IServiceProvider serviceProvider)
     {
         _dbContext = dbContext;
-        _hnswIndex = hnswIndex;
         _serviceProvider = serviceProvider;
     }
 
     public async Task<IndexStats> GetIndexStatsAsync()
     {
-        var chunks = await _dbContext.GetAllChunksAsync();
-
-        var uniqueFiles = chunks
-            .Select(c => c.FilePath)
-            .Distinct()
-            .Count();
-
-        var totalSize = chunks.Sum(c => c.Content?.Length ?? 0);
+        var totalChunks = await _dbContext.Chunks.CountAsync();
+        var uniqueFiles = await _dbContext.Chunks.Select(c => c.FilePath).Distinct().CountAsync();
+        var totalSize = await _dbContext.Chunks.SumAsync(c => c.Content.Length);
+        var lastUpdated = totalChunks > 0
+            ? await _dbContext.Chunks.MaxAsync(c => c.IndexedAt)
+            : (DateTime?)null;
 
         return new IndexStats
         {
-            TotalChunks = chunks.Count,
+            TotalChunks = totalChunks,
             TotalFiles = uniqueFiles,
             IndexSizeBytes = totalSize,
-            HnswBuilt = _hnswIndex.IsBuilt,
-            HnswVectorCount = _hnswIndex.Count,
-            LastUpdated = chunks.Count > 0
-                ? chunks.Max(c => c.IndexedAt)
-                : null
+            VectorIndexEnabled = true, // pgvector HNSW is always enabled
+            VectorCount = totalChunks,
+            LastUpdated = lastUpdated
         };
     }
 
     public async Task<List<IndexedProject>> GetIndexedProjectsAsync()
     {
-        var chunks = await _dbContext.GetAllChunksAsync();
+        var chunks = await _dbContext.Chunks.ToListAsync();
 
         if (chunks.Count == 0)
             return [];
@@ -150,7 +143,11 @@ public class DashboardService
 
     public async Task<List<ActivityLogDto>> GetRecentActivityAsync(int limit = 20)
     {
-        var logs = await _dbContext.GetRecentActivityLogsAsync(limit);
+        var logs = await _dbContext.ActivityLogs
+            .OrderByDescending(l => l.Timestamp)
+            .Take(limit)
+            .ToListAsync();
+
         return logs.Select(l => new ActivityLogDto
         {
             Id = l.Id,
@@ -164,7 +161,11 @@ public class DashboardService
 
     public async Task<List<SearchHistoryDto>> GetSearchHistoryAsync(int limit = 20)
     {
-        var history = await _dbContext.GetRecentSearchHistoryAsync(limit);
+        var history = await _dbContext.SearchHistory
+            .OrderByDescending(h => h.Timestamp)
+            .Take(limit)
+            .ToListAsync();
+
         return history.Select(h => new SearchHistoryDto
         {
             Id = h.Id,
@@ -172,19 +173,29 @@ public class DashboardService
             ResultCount = h.ResultCount,
             DurationMs = h.DurationMs,
             CacheHit = h.CacheHit,
-            UsedHnsw = h.UsedHnsw,
+            UsedHnsw = h.UsedPgvector,
             Timestamp = h.Timestamp
         }).ToList();
     }
 
     public async Task<List<PerformanceDataPointDto>> GetPerformanceMetricsAsync(int hoursBack = 24)
     {
-        var dbMetrics = await _dbContext.GetHourlyPerformanceMetricsAsync(hoursBack);
+        var cutoff = DateTime.UtcNow.AddHours(-hoursBack);
 
-        // Create a lookup for the actual data
-        var metricsLookup = dbMetrics.ToDictionary(
-            m => m.Hour.ToString("yyyy-MM-dd HH:00"),
-            m => (m.AvgSearchTimeMs, m.AvgIndexTimeMs));
+        // Get activity logs for the time period
+        var logs = await _dbContext.ActivityLogs
+            .Where(l => l.Timestamp >= cutoff)
+            .ToListAsync();
+
+        // Group by hour and calculate averages in memory
+        var metricsLookup = logs
+            .GroupBy(l => new DateTime(l.Timestamp.Year, l.Timestamp.Month, l.Timestamp.Day, l.Timestamp.Hour, 0, 0, DateTimeKind.Utc))
+            .ToDictionary(
+                g => g.Key.ToString("yyyy-MM-dd HH:00"),
+                g => (
+                    AvgSearchTimeMs: g.Where(x => x.ActivityType == "search").Select(x => x.DurationMs).DefaultIfEmpty(0).Average(),
+                    AvgIndexTimeMs: g.Where(x => x.ActivityType == "index").Select(x => x.DurationMs).DefaultIfEmpty(0).Average()
+                ));
 
         // Generate all hours in the range
         var result = new List<PerformanceDataPointDto>();
@@ -226,8 +237,8 @@ public class IndexStats
     public int TotalChunks { get; set; }
     public int TotalFiles { get; set; }
     public long IndexSizeBytes { get; set; }
-    public bool HnswBuilt { get; set; }
-    public int HnswVectorCount { get; set; }
+    public bool VectorIndexEnabled { get; set; }
+    public int VectorCount { get; set; }
     public DateTime? LastUpdated { get; set; }
 
     public string FormattedSize => IndexSizeBytes switch

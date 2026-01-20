@@ -5,7 +5,6 @@ using Grigori.Contracts.Options;
 using Grigori.Contracts.Results;
 using Grigori.Database;
 using Grigori.Infrastructure.Chunking;
-using Grigori.Infrastructure.Indexing;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -18,7 +17,6 @@ public class IndexService : IIndexService
     private readonly IEmbeddingProvider _embeddingProvider;
     private readonly IMetricsService _metricsService;
     private readonly ChunkingService _chunkingService;
-    private readonly HnswIndex _hnswIndex;
     private readonly GrigoriOptions _options;
     private readonly ILogger<IndexService> _logger;
 
@@ -27,7 +25,6 @@ public class IndexService : IIndexService
         IEmbeddingProvider embeddingProvider,
         IMetricsService metricsService,
         ChunkingService chunkingService,
-        HnswIndex hnswIndex,
         IOptions<GrigoriOptions> options,
         ILogger<IndexService> logger)
     {
@@ -35,7 +32,6 @@ public class IndexService : IIndexService
         _embeddingProvider = embeddingProvider;
         _metricsService = metricsService;
         _chunkingService = chunkingService;
-        _hnswIndex = hnswIndex;
         _options = options.Value;
         _logger = logger;
     }
@@ -114,12 +110,6 @@ public class IndexService : IIndexService
             if (totalFilesIndexed > 0)
             {
                 await _metricsService.RecordIndexingAsync(request.Path, stopwatch.ElapsedMilliseconds, totalFilesIndexed, totalChunksIndexed, cancellationToken);
-
-                // Rebuild HNSW index if enabled
-                if (_options.Hnsw.Enabled)
-                {
-                    await RebuildHnswIndexAsync(cancellationToken);
-                }
             }
 
             return new IndexResultDto
@@ -159,12 +149,6 @@ public class IndexService : IIndexService
 
             stopwatch.Stop();
             await _metricsService.RecordIndexingAsync(filePath, stopwatch.ElapsedMilliseconds, 1, chunkCount.Value, cancellationToken);
-
-            // Rebuild HNSW index if enabled
-            if (_options.Hnsw.Enabled && chunkCount.Value > 0)
-            {
-                await RebuildHnswIndexAsync(cancellationToken);
-            }
 
             return new IndexResultDto
             {
@@ -243,31 +227,5 @@ public class IndexService : IIndexService
     {
         var extension = Path.GetExtension(path).ToLowerInvariant();
         return _options.FileExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
-    }
-
-    private async Task RebuildHnswIndexAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            var stopwatch = Stopwatch.StartNew();
-            var embeddings = await _chunkRepository.GetAllEmbeddingsAsync(cancellationToken);
-            var embeddingList = embeddings.ToList();
-
-            if (embeddingList.Count == 0)
-            {
-                _logger.LogDebug("No embeddings found, skipping HNSW index rebuild");
-                return;
-            }
-
-            _hnswIndex.BuildIndex(embeddingList);
-            stopwatch.Stop();
-
-            _logger.LogInformation("Rebuilt HNSW index with {Count} vectors in {ElapsedMs}ms",
-                embeddingList.Count, stopwatch.ElapsedMilliseconds);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to rebuild HNSW index");
-        }
     }
 }

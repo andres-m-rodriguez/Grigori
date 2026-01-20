@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Grigori.Database.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +9,15 @@ public class GrigoriDbContext : DbContext
 {
     public GrigoriDbContext(DbContextOptions<GrigoriDbContext> options) : base(options)
     {
+    }
+
+    /// <summary>
+    /// Computes a SHA256 hash of the given content for deduplication.
+    /// </summary>
+    public static string ComputeHash(string content)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(content));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     public DbSet<ChunkEntity> Chunks { get; set; } = null!;
