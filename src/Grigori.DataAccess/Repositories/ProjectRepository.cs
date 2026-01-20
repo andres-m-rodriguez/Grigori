@@ -9,14 +9,14 @@ namespace Grigori.DataAccess.Repositories;
 
 public class ProjectRepository : IProjectRepository
 {
-    private readonly GrigoriDbContext _dbContext;
+    private readonly IDbContextFactory<GrigoriDbContext> _dbContextFactory;
     private readonly ILogger<ProjectRepository> _logger;
 
     public ProjectRepository(
-        GrigoriDbContext dbContext,
+        IDbContextFactory<GrigoriDbContext> dbContextFactory,
         ILogger<ProjectRepository> logger)
     {
-        _dbContext = dbContext;
+        _dbContextFactory = dbContextFactory;
         _logger = logger;
     }
 
@@ -26,7 +26,9 @@ public class ProjectRepository : IProjectRepository
     {
         try
         {
-            var exists = await _dbContext.Projects
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var exists = await dbContext.Projects
                 .AnyAsync(p => p.GitHubRepoFullName == input.GitHubRepoFullName, cancellationToken);
 
             if (exists)
@@ -48,8 +50,8 @@ public class ProjectRepository : IProjectRepository
                 UpdatedAt = now
             };
 
-            _dbContext.Projects.Add(entity);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.Projects.Add(entity);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Created project {Name} ({RepoFullName})", input.Name, input.GitHubRepoFullName);
 
@@ -68,7 +70,9 @@ public class ProjectRepository : IProjectRepository
     {
         try
         {
-            var entity = await _dbContext.Projects
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var entity = await dbContext.Projects
                 .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
             if (entity is null)
@@ -91,7 +95,9 @@ public class ProjectRepository : IProjectRepository
     {
         try
         {
-            var entity = await _dbContext.Projects
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var entity = await dbContext.Projects
                 .FirstOrDefaultAsync(p => p.GitHubRepoFullName == repoFullName, cancellationToken);
 
             if (entity is null)
@@ -113,7 +119,9 @@ public class ProjectRepository : IProjectRepository
     {
         try
         {
-            var entities = await _dbContext.Projects
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var entities = await dbContext.Projects
                 .OrderByDescending(p => p.UpdatedAt)
                 .ToListAsync(cancellationToken);
 
@@ -134,7 +142,9 @@ public class ProjectRepository : IProjectRepository
     {
         try
         {
-            var entity = await _dbContext.Projects
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var entity = await dbContext.Projects
                 .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
             if (entity is null)
@@ -151,7 +161,7 @@ public class ProjectRepository : IProjectRepository
                 entity.LastIndexedAt = DateTime.UtcNow;
             }
 
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Updated project {Id} status to {Status}", id, status);
 
@@ -173,7 +183,9 @@ public class ProjectRepository : IProjectRepository
     {
         try
         {
-            var entity = await _dbContext.Projects
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var entity = await dbContext.Projects
                 .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
             if (entity is null)
@@ -186,7 +198,7 @@ public class ProjectRepository : IProjectRepository
             entity.LastIndexedCommitSha = commitSha;
             entity.UpdatedAt = DateTime.UtcNow;
 
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
                 "Updated indexing stats for project {Id}: {FileCount} files, {ChunkCount} chunks",
@@ -207,7 +219,9 @@ public class ProjectRepository : IProjectRepository
     {
         try
         {
-            var deleted = await _dbContext.Projects
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var deleted = await dbContext.Projects
                 .Where(p => p.Id == id)
                 .ExecuteDeleteAsync(cancellationToken);
 
@@ -231,7 +245,9 @@ public class ProjectRepository : IProjectRepository
         string repoFullName,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Projects
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await dbContext.Projects
             .AnyAsync(p => p.GitHubRepoFullName == repoFullName, cancellationToken);
     }
 

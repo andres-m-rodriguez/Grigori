@@ -10,12 +10,12 @@ namespace Grigori.DataAccess.Repositories;
 
 public class MetricsRepository : IMetricsRepository
 {
-    private readonly GrigoriDbContext _dbContext;
+    private readonly IDbContextFactory<GrigoriDbContext> _dbContextFactory;
     private readonly ILogger<MetricsRepository> _logger;
 
-    public MetricsRepository(GrigoriDbContext dbContext, ILogger<MetricsRepository> logger)
+    public MetricsRepository(IDbContextFactory<GrigoriDbContext> dbContextFactory, ILogger<MetricsRepository> logger)
     {
-        _dbContext = dbContext;
+        _dbContextFactory = dbContextFactory;
         _logger = logger;
     }
 
@@ -29,6 +29,8 @@ public class MetricsRepository : IMetricsRepository
     {
         try
         {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
             var entity = new SearchHistoryEntity
             {
                 Query = query,
@@ -39,8 +41,8 @@ public class MetricsRepository : IMetricsRepository
                 Timestamp = DateTime.UtcNow
             };
 
-            _dbContext.SearchHistory.Add(entity);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.SearchHistory.Add(entity);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             return entity.Id;
         }
@@ -60,6 +62,8 @@ public class MetricsRepository : IMetricsRepository
     {
         try
         {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
             var entity = new ActivityLogEntity
             {
                 ActivityType = activityType,
@@ -69,8 +73,8 @@ public class MetricsRepository : IMetricsRepository
                 Timestamp = DateTime.UtcNow
             };
 
-            _dbContext.ActivityLogs.Add(entity);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.ActivityLogs.Add(entity);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             return entity.Id;
         }
@@ -87,7 +91,9 @@ public class MetricsRepository : IMetricsRepository
     {
         try
         {
-            var logs = await _dbContext.ActivityLogs
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var logs = await dbContext.ActivityLogs
                 .OrderByDescending(l => l.Timestamp)
                 .Take(limit)
                 .Select(l => new ActivityLogDto(l.Id, l.ActivityType, l.Description, l.DurationMs, l.Timestamp, l.Details))
@@ -108,7 +114,9 @@ public class MetricsRepository : IMetricsRepository
     {
         try
         {
-            var history = await _dbContext.SearchHistory
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var history = await dbContext.SearchHistory
                 .OrderByDescending(h => h.Timestamp)
                 .Take(limit)
                 .Select(h => new SearchHistoryDto(h.Id, h.Query, h.ResultCount, h.DurationMs, h.CacheHit, h.UsedPgvector, h.Timestamp))
@@ -129,9 +137,11 @@ public class MetricsRepository : IMetricsRepository
     {
         try
         {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
             var cutoff = DateTime.UtcNow.AddHours(-hoursBack);
 
-            var logs = await _dbContext.ActivityLogs
+            var logs = await dbContext.ActivityLogs
                 .Where(l => l.Timestamp >= cutoff)
                 .ToListAsync(cancellationToken);
 
