@@ -10,27 +10,21 @@ var postgres = builder.AddPostgres("postgres")
 var grigoriDb = postgres.AddDatabase("grigori");
 
 // Embedder service (gRPC server for generating embeddings)
-var embedder = builder.AddProject("embedder", "../Grigori.Embedder/Grigori.Embedder.csproj")
-    .WithEndpoint("grpc", e =>
-    {
-        e.Port = 50051;
-        e.TargetPort = 50051;
-        e.IsProxied = false;
-    });
+var embedder = builder.AddProject<Projects.Grigori_Embedder>("embedder");
 
 // Grigori API (includes Dashboard)
-var api = builder.AddProject("api", "../Grigori.Api/Grigori.Api.csproj")
+var api = builder.AddProject<Projects.Grigori_Api>("api")
     .WithReference(grigoriDb)
     .WaitFor(grigoriDb)
-    .WithEnvironment("Embedder__Host", embedder.GetEndpoint("grpc"))
+    .WithReference(embedder)
     .WaitFor(embedder)
     .WithExternalHttpEndpoints();
 
 // Grigori MCP Server
-builder.AddProject("mcp", "../Grigori.Mcp/Grigori.Mcp.csproj")
+builder.AddProject<Projects.Grigori_Mcp>("mcp")
     .WithReference(grigoriDb)
     .WaitFor(grigoriDb)
-    .WithEnvironment("Embedder__Host", embedder.GetEndpoint("grpc"))
+    .WithReference(embedder)
     .WaitFor(embedder);
 
 builder.Build().Run();

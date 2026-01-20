@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.0.0">
+﻿<Project Sdk="Aspire.AppHost.Sdk/13.0.0">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -11,6 +11,13 @@
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.0.0" />
     <PackageReference Include="KubernetesClient" Version="18.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Grigori.Api\Grigori.Api.csproj" />
+    <ProjectReference Include="..\Grigori.Mcp\Grigori.Mcp.csproj" />
+    <ProjectReference Include="..\Grigori.Embedder\Grigori.Embedder.csproj" />
+    
   </ItemGroup>
 
 </Project>
