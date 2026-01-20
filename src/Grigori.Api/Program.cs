@@ -16,22 +16,19 @@ var builder = WebApplication.CreateBuilder(args);
 // Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
 builder.AddServiceDefaults();
 
-// Add Aspire PostgreSQL EF Core integration (gets connection string from Aspire)
-builder.AddNpgsqlDbContext<GrigoriDbContext>("grigori", configureDbContextOptions: options =>
-{
-    options.UseNpgsql(npgsqlOptions => npgsqlOptions.UseVector());
-});
-
-// Add DbContextFactory for thread-safe concurrent operations (e.g., Task.WhenAll)
-builder.Services.AddDbContextFactory<GrigoriDbContext>(options =>
-{
-    // Connection string will be configured by Aspire at runtime
-    var connectionString = builder.Configuration.GetConnectionString("grigori");
-    if (!string.IsNullOrEmpty(connectionString))
+// Add Aspire PostgreSQL EF Core integration (registers pooled DbContext)
+builder.AddNpgsqlDbContext<GrigoriDbContext>("grigori",
+    configureDbContextOptions: options =>
     {
-        options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.UseVector());
-    }
-}, ServiceLifetime.Scoped);
+        options.UseNpgsql(npgsqlOptions => npgsqlOptions.UseVector());
+    });
+
+// Add DbContextFactory using the same Aspire connection string
+builder.Services.AddPooledDbContextFactory<GrigoriDbContext>((sp, options) =>
+{
+    var connectionString = builder.Configuration.GetConnectionString("grigori");
+    options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.UseVector());
+});
 
 // Configure options
 builder.Services.Configure<GrigoriOptions>(builder.Configuration.GetSection(GrigoriOptions.SectionName));
