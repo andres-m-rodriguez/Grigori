@@ -53,6 +53,12 @@ public readonly record struct GrigoriError
     public static GrigoriError Unknown(string message, Exception? ex = null) =>
         new(GrigoriErrorCode.Unknown, message, exception: ex);
 
+    public static GrigoriError NotFound(string entity, string identifier) =>
+        new(GrigoriErrorCode.NotFound, $"{entity} not found: {identifier}", identifier);
+
+    public static GrigoriError AlreadyExists(string entity, string identifier) =>
+        new(GrigoriErrorCode.AlreadyExists, $"{entity} already exists: {identifier}", identifier);
+
     public override string ToString() => Details is not null
         ? $"[{Code}] {Message} (Details: {Details})"
         : $"[{Code}] {Message}";
@@ -73,5 +79,7 @@ public enum GrigoriErrorCode
     DatabaseError,
     ChunkingError,
     ValidationError,
-    ConfigurationError
+    ConfigurationError,
+    NotFound,
+    AlreadyExists
 }

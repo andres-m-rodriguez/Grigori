@@ -11,6 +11,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IChunkRepository, ChunkRepository>();
         services.AddSingleton<IMetricsRepository, MetricsRepository>();
         services.AddSingleton<IDashboardRepository, DashboardRepository>();
+        services.AddSingleton<IProjectRepository, ProjectRepository>();
         return services;
     }
 }

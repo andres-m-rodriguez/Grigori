@@ -63,4 +63,13 @@ public interface IGitHubService
     /// <param name="owner">Repository owner</param>
     /// <param name="repo">Repository name</param>
     Task<List<GitHubBranchDto>> GetBranchesAsync(string owner, string repo);
+
+    /// <summary>
+    /// Downloads a repository as a zip file to the specified path.
+    /// </summary>
+    /// <param name="owner">Repository owner</param>
+    /// <param name="repo">Repository name</param>
+    /// <param name="branch">Branch to download (default branch if null)</param>
+    /// <param name="outputPath">Path to save the zip file</param>
+    Task<bool> DownloadRepositoryZipAsync(string owner, string repo, string? branch, string outputPath, CancellationToken cancellationToken = default);
 }
