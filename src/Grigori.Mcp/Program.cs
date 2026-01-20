@@ -5,7 +5,6 @@ using Grigori.Database;
 using Grigori.Database.Extensions;
 using Grigori.DataAccess.Extensions;
 using Grigori.Infrastructure.Extensions;
-using Grigori.Infrastructure.Indexing;
 using Grigori.Mcp.Dashboard.Components;
 using Grigori.Mcp.Dashboard.Services;
 using Grigori.Mcp.Features.Benchmark.Endpoints;
@@ -15,6 +14,7 @@ using Grigori.Mcp.Features.Index.Services;
 using Grigori.Mcp.Features.Metrics.Endpoints;
 using Grigori.Mcp.Features.Search.Endpoints;
 using Grigori.Mcp.Features.Search.Services;
+using Microsoft.EntityFrameworkCore;
 using ModelContextProtocol.Server;
 using MudBlazor.Services;
 
@@ -113,7 +113,14 @@ else if (serverMode || mcpHttpMode)
 
 var app = builder.Build();
 
-// Eagerly initialize embedding provider to start background model loading
+// Ensure database is created and migrated
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<GrigoriDbContext>();
+    await dbContext.Database.EnsureCreatedAsync();
+}
+
+// Eagerly initialize embedding provider to start background connection
 // This triggers registration with the dependency tracker
 _ = app.Services.GetRequiredService<IEmbeddingProvider>();
 

@@ -6,6 +6,7 @@
     <Project Path="src/Grigori.Infrastructure/Grigori.Infrastructure.csproj" />
     <Project Path="src/Grigori.Mcp/Grigori.Mcp.csproj" />
     <Project Path="src/Grigori.Cli/Grigori.Cli.csproj" />
+    <Project Path="src/Grigori.Embedder/Grigori.Embedder.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Grigori.Tests/Grigori.Tests.csproj" />

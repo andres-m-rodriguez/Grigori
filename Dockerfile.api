@@ -1,0 +1,62 @@
+# =============================================================================
+# Grigori API + Dashboard - Dockerfile
+# =============================================================================
+# Builds the REST API and Blazor Dashboard image
+#
+# Usage:
+#   docker build -f Dockerfile.api -t grigori-api .
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build
+# -----------------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+
+WORKDIR /src
+
+# Copy solution and project files first (better layer caching)
+COPY Grigori.slnx ./
+COPY src/Grigori.Contracts/Grigori.Contracts.csproj src/Grigori.Contracts/
+COPY src/Grigori.Database/Grigori.Database.csproj src/Grigori.Database/
+COPY src/Grigori.DataAccess/Grigori.DataAccess.csproj src/Grigori.DataAccess/
+COPY src/Grigori.Infrastructure/Grigori.Infrastructure.csproj src/Grigori.Infrastructure/
+COPY src/Grigori.Mcp/Grigori.Mcp.csproj src/Grigori.Mcp/
+
+# Restore dependencies
+RUN dotnet restore src/Grigori.Mcp/Grigori.Mcp.csproj
+
+# Copy source code
+COPY src/ src/
+
+# Build and publish
+RUN dotnet publish src/Grigori.Mcp/Grigori.Mcp.csproj \
+    -c Release \
+    -o /app/publish \
+    -p:SelfContained=false \
+    -p:PublishSingleFile=false
+
+# -----------------------------------------------------------------------------
+# Stage 2: Runtime
+# -----------------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+
+# Create non-root user for security
+RUN groupadd -r grigori && useradd -r -g grigori -m -d /home/grigori grigori
+
+WORKDIR /app
+
+# Copy published app
+COPY --from=build --chown=grigori:grigori /app/publish /app
+
+# Environment configuration
+ENV ASPNETCORE_URLS=http://+:5151 \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    Grigori__EmbeddingProvider=grpc \
+    Grigori__EmbeddingService__Address=http://embedder:50051 \
+    Grigori__Database__ConnectionString=Host=postgres;Database=grigori;Username=grigori;Password=grigori
+
+EXPOSE 5151
+
+USER grigori
+
+ENTRYPOINT ["dotnet", "/app/Grigori.Mcp.dll", "--server"]

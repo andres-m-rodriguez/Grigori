@@ -1,6 +1,7 @@
 using Grigori.Contracts.Dtos.Metrics;
 using Grigori.Contracts.Interfaces;
 using Grigori.Database;
+using Grigori.Database.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace Grigori.Infrastructure.Metrics;
@@ -19,8 +20,8 @@ public class MetricsService : IMetricsService
     private long _totalResultsReturned;
     private long _cacheHits;
     private long _cacheMisses;
-    private long _hnswSearches;
-    private long _nonHnswSearches;
+    private long _pgvectorSearches;
+    private long _nonPgvectorSearches;
 
     private long _totalIndexingTimeMs;
     private long _totalFilesIndexed;
@@ -37,7 +38,7 @@ public class MetricsService : IMetricsService
         _serverStartTime = DateTime.UtcNow;
     }
 
-    public void RecordSearch(long durationMs, int resultCount, bool cacheHit, bool usedHnsw)
+    public void RecordSearch(long durationMs, int resultCount, bool cacheHit, bool usedPgvector)
     {
         Interlocked.Increment(ref _totalSearches);
         Interlocked.Add(ref _totalSearchTimeMs, durationMs);
@@ -48,10 +49,10 @@ public class MetricsService : IMetricsService
         else
             Interlocked.Increment(ref _cacheMisses);
 
-        if (usedHnsw)
-            Interlocked.Increment(ref _hnswSearches);
+        if (usedPgvector)
+            Interlocked.Increment(ref _pgvectorSearches);
         else
-            Interlocked.Increment(ref _nonHnswSearches);
+            Interlocked.Increment(ref _nonPgvectorSearches);
     }
 
     public void RecordIndexing(long durationMs, int fileCount, int chunkCount)
@@ -94,7 +95,7 @@ public class MetricsService : IMetricsService
         var totalResultsReturned = Interlocked.Read(ref _totalResultsReturned);
         var cacheHits = Interlocked.Read(ref _cacheHits);
         var cacheMisses = Interlocked.Read(ref _cacheMisses);
-        var hnswSearches = Interlocked.Read(ref _hnswSearches);
+        var pgvectorSearches = Interlocked.Read(ref _pgvectorSearches);
 
         var totalIndexingTimeMs = Interlocked.Read(ref _totalIndexingTimeMs);
         var totalFilesIndexed = Interlocked.Read(ref _totalFilesIndexed);
@@ -114,7 +115,7 @@ public class MetricsService : IMetricsService
                 TotalSearches = totalSearches,
                 CacheHits = cacheHits,
                 CacheMisses = cacheMisses,
-                HnswSearches = hnswSearches,
+                HnswSearches = pgvectorSearches, // Keep same DTO field name for compatibility
                 AverageTimeMs = totalSearches > 0 ? Math.Round((double)totalSearchTimeMs / totalSearches, 2) : 0,
                 AverageResultCount = totalSearches > 0 ? Math.Round((double)totalResultsReturned / totalSearches, 2) : 0
             },
@@ -141,8 +142,8 @@ public class MetricsService : IMetricsService
         Interlocked.Exchange(ref _totalResultsReturned, 0);
         Interlocked.Exchange(ref _cacheHits, 0);
         Interlocked.Exchange(ref _cacheMisses, 0);
-        Interlocked.Exchange(ref _hnswSearches, 0);
-        Interlocked.Exchange(ref _nonHnswSearches, 0);
+        Interlocked.Exchange(ref _pgvectorSearches, 0);
+        Interlocked.Exchange(ref _nonPgvectorSearches, 0);
 
         Interlocked.Exchange(ref _totalIndexingTimeMs, 0);
         Interlocked.Exchange(ref _totalFilesIndexed, 0);
@@ -158,15 +159,25 @@ public class MetricsService : IMetricsService
         }
     }
 
-    public async Task RecordSearchAsync(string query, long durationMs, int resultCount, bool cacheHit, bool usedHnsw, CancellationToken cancellationToken = default)
+    public async Task RecordSearchAsync(string query, long durationMs, int resultCount, bool cacheHit, bool usedPgvector, CancellationToken cancellationToken = default)
     {
         // Record in-memory metrics first
-        RecordSearch(durationMs, resultCount, cacheHit, usedHnsw);
+        RecordSearch(durationMs, resultCount, cacheHit, usedPgvector);
 
         // Persist to database
         try
         {
-            await _dbContext.InsertSearchHistoryAsync(query, resultCount, durationMs, cacheHit, usedHnsw, cancellationToken);
+            var entity = new SearchHistoryEntity
+            {
+                Query = query,
+                ResultCount = resultCount,
+                DurationMs = durationMs,
+                CacheHit = cacheHit,
+                UsedPgvector = usedPgvector,
+                Timestamp = DateTime.UtcNow
+            };
+            _dbContext.SearchHistory.Add(entity);
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -191,7 +202,16 @@ public class MetricsService : IMetricsService
                 ChunkCount = chunkCount
             });
 
-            await _dbContext.InsertActivityLogAsync("indexing", description, durationMs, details, cancellationToken);
+            var entity = new ActivityLogEntity
+            {
+                ActivityType = "indexing",
+                Description = description,
+                DurationMs = durationMs,
+                Details = details,
+                Timestamp = DateTime.UtcNow
+            };
+            _dbContext.ActivityLogs.Add(entity);
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
         catch (Exception ex)
         {

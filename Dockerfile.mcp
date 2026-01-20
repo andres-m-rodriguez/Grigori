@@ -1,0 +1,63 @@
+# =============================================================================
+# Grigori MCP Server - Dockerfile
+# =============================================================================
+# Builds the MCP Server image for AI client integration
+#
+# Usage:
+#   docker build -f Dockerfile.mcp -t grigori-mcp .
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build
+# -----------------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+
+WORKDIR /src
+
+# Copy solution and project files first (better layer caching)
+COPY Grigori.slnx ./
+COPY src/Grigori.Contracts/Grigori.Contracts.csproj src/Grigori.Contracts/
+COPY src/Grigori.Database/Grigori.Database.csproj src/Grigori.Database/
+COPY src/Grigori.DataAccess/Grigori.DataAccess.csproj src/Grigori.DataAccess/
+COPY src/Grigori.Infrastructure/Grigori.Infrastructure.csproj src/Grigori.Infrastructure/
+COPY src/Grigori.Mcp/Grigori.Mcp.csproj src/Grigori.Mcp/
+
+# Restore dependencies
+RUN dotnet restore src/Grigori.Mcp/Grigori.Mcp.csproj
+
+# Copy source code
+COPY src/ src/
+
+# Build and publish - single file for MCP stdio transport
+RUN dotnet publish src/Grigori.Mcp/Grigori.Mcp.csproj \
+    -c Release \
+    -o /app/publish \
+    -r linux-x64 \
+    -p:SelfContained=true \
+    -p:PublishSingleFile=true \
+    -p:PublishTrimmed=false
+
+# -----------------------------------------------------------------------------
+# Stage 2: Runtime
+# -----------------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0 AS runtime
+
+# Create non-root user for security
+RUN groupadd -r grigori && useradd -r -g grigori -m -d /home/grigori grigori
+
+WORKDIR /app
+
+# Copy published app
+COPY --from=build --chown=grigori:grigori /app/publish/Grigori.Mcp /app/grigori-mcp
+
+# Environment configuration
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    DOTNET_BUNDLE_EXTRACT_BASE_DIR=/home/grigori/.net \
+    Grigori__EmbeddingProvider=grpc \
+    Grigori__EmbeddingService__Address=http://embedder:50051 \
+    Grigori__Database__ConnectionString=Host=postgres;Database=grigori;Username=grigori;Password=grigori
+
+USER grigori
+
+# MCP stdio mode - for use with Claude or other MCP clients
+ENTRYPOINT ["/app/grigori-mcp", "--mcp"]

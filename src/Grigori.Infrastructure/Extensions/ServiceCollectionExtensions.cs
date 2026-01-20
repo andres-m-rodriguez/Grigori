@@ -4,11 +4,8 @@ using Grigori.Infrastructure.Chunking;
 using Grigori.Infrastructure.Dependencies;
 using Grigori.Infrastructure.Embeddings;
 using Grigori.Infrastructure.FileWatching;
-using Grigori.Infrastructure.Indexing;
 using Grigori.Infrastructure.Metrics;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Grigori.Infrastructure.Extensions;
 
@@ -29,31 +26,20 @@ public static class ServiceCollectionExtensions
         // File watching
         services.AddSingleton<FileWatcher>();
 
-        // HNSW Index (singleton for in-memory vector index)
-        services.AddSingleton<HnswIndex>(sp =>
-        {
-            var options = sp.GetRequiredService<IOptions<GrigoriOptions>>();
-            var logger = sp.GetRequiredService<ILogger<HnswIndex>>();
-            var hnsw = options.Value.Hnsw;
-
-            return new HnswIndex(
-                logger,
-                hnsw.M,
-                hnsw.EfConstruction,
-                hnsw.EfSearch);
-        });
+        // Note: HNSW index removed - using pgvector for vector similarity search
 
         // Embedding provider (based on configuration)
         services.AddSingleton<IEmbeddingProvider>(sp =>
         {
-            var options = sp.GetRequiredService<IOptions<GrigoriOptions>>();
+            var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<GrigoriOptions>>();
             var provider = options.Value.EmbeddingProvider.ToLowerInvariant();
 
             return provider switch
             {
+                "grpc" => ActivatorUtilities.CreateInstance<GrpcEmbeddingProvider>(sp),
                 "voyage" => ActivatorUtilities.CreateInstance<VoyageEmbeddingProvider>(sp),
                 "onnx" => ActivatorUtilities.CreateInstance<OnnxEmbeddingProvider>(sp),
-                _ => ActivatorUtilities.CreateInstance<OnnxEmbeddingProvider>(sp)
+                _ => ActivatorUtilities.CreateInstance<GrpcEmbeddingProvider>(sp)
             };
         });
 
