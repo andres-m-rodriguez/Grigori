@@ -71,7 +71,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<GrigoriDbContext>();
-    await dbContext.Database.EnsureCreatedAsync();
+    await dbContext.Database.MigrateAsync();
 }
 
 // Eagerly initialize embedding provider to start background connection
@@ -175,6 +175,71 @@ app.MapPost("/api/benchmark", async (BenchmarkRequest request, BenchmarkService 
 }).WithTags("Benchmark");
 
 // ============================================================================
+// Projects API - GitHub Project Indexing
+// ============================================================================
+
+// Get all projects
+app.MapGet("/api/projects", async (IProjectRepository projectRepository, CancellationToken ct) =>
+{
+    var result = await projectRepository.GetAllAsync(ct);
+    return result.Match(
+        success => Results.Ok(success),
+        error => Results.BadRequest(new { error = error.Message })
+    );
+}).WithTags("Projects");
+
+// Get project by ID
+app.MapGet("/api/projects/{id:long}", async (long id, IProjectRepository projectRepository, CancellationToken ct) =>
+{
+    var result = await projectRepository.GetByIdAsync(id, ct);
+    return result.Match(
+        success => Results.Ok(success),
+        error => error.Code == Grigori.Contracts.Results.GrigoriErrorCode.NotFound
+            ? Results.NotFound(new { error = error.Message })
+            : Results.BadRequest(new { error = error.Message })
+    );
+}).WithTags("Projects");
+
+// Register a project (from GitHub repository)
+app.MapPost("/api/projects", async (RegisterProjectRequest request, IGitHubIndexingService indexingService, CancellationToken ct) =>
+{
+    if (string.IsNullOrEmpty(request.RepoFullName))
+        return Results.BadRequest(new { error = "RepoFullName is required" });
+
+    var result = await indexingService.RegisterProjectAsync(request.RepoFullName, ct);
+    return result.Match(
+        success => Results.Created($"/api/projects/{success.Id}", success),
+        error => error.Code == Grigori.Contracts.Results.GrigoriErrorCode.AlreadyExists
+            ? Results.Conflict(new { error = error.Message })
+            : Results.BadRequest(new { error = error.Message })
+    );
+}).WithTags("Projects");
+
+// Index a project
+app.MapPost("/api/projects/{id:long}/index", async (long id, IGitHubIndexingService indexingService, CancellationToken ct) =>
+{
+    var result = await indexingService.IndexRepositoryAsync(id, ct);
+    return result.Match(
+        success => Results.Ok(success),
+        error => error.Code == Grigori.Contracts.Results.GrigoriErrorCode.NotFound
+            ? Results.NotFound(new { error = error.Message })
+            : Results.BadRequest(new { error = error.Message })
+    );
+}).WithTags("Projects");
+
+// Delete a project
+app.MapDelete("/api/projects/{id:long}", async (long id, IProjectRepository projectRepository, CancellationToken ct) =>
+{
+    var result = await projectRepository.DeleteAsync(id, ct);
+    return result.Match(
+        success => Results.NoContent(),
+        error => error.Code == Grigori.Contracts.Results.GrigoriErrorCode.NotFound
+            ? Results.NotFound(new { error = error.Message })
+            : Results.BadRequest(new { error = error.Message })
+    );
+}).WithTags("Projects");
+
+// ============================================================================
 // Dashboard (Blazor)
 // ============================================================================
 
@@ -209,3 +274,4 @@ record IndexRequest(string Path);
 record IndexFilesRequest(string? ProjectName, List<FileContent> Files);
 record FileContent(string RelativePath, string Content);
 record BenchmarkRequest(string Query, string Directory);
+record RegisterProjectRequest(string RepoFullName);

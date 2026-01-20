@@ -225,6 +225,35 @@ public class GitHubService : IGitHubService, IDisposable
         }
     }
 
+    public async Task<bool> DownloadRepositoryZipAsync(string owner, string repo, string? branch, string outputPath, CancellationToken cancellationToken = default)
+    {
+        if (!IsAuthenticated)
+            return false;
+
+        try
+        {
+            var branchRef = branch ?? "HEAD";
+            var response = await _httpClient.GetAsync($"repos/{owner}/{repo}/zipball/{branchRef}", cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Failed to download repository {Owner}/{Repo}: {Status}", owner, repo, response.StatusCode);
+                return false;
+            }
+
+            await using var fs = File.Create(outputPath);
+            await response.Content.CopyToAsync(fs, cancellationToken);
+
+            _logger.LogInformation("Downloaded repository {Owner}/{Repo} to {Path}", owner, repo, outputPath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to download repository {Owner}/{Repo}", owner, repo);
+            return false;
+        }
+    }
+
     private static string GetTokenFilePath()
     {
         // Use LocalApplicationData on Windows, or home directory on Linux/macOS

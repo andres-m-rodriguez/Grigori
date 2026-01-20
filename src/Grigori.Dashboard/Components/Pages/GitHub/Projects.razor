@@ -1,5 +1,6 @@
 @page "/github/projects"
 @using Grigori.Contracts.Dtos.GitHub
+@using Grigori.Contracts.Interfaces
 
 <PageTitle>GitHub Projects - Grigori</PageTitle>
 
@@ -58,6 +59,13 @@
                             <button class="gh-filter-btn @(_visibilityFilter == "private" ? "active" : "")" @onclick="@(() => _visibilityFilter = "private")">Private</button>
                         </div>
                     </div>
+                    <div style="min-width: 150px;">
+                        <div class="gh-filter-group">
+                            <button class="gh-filter-btn @(_indexFilter == "all" ? "active" : "")" @onclick="@(() => _indexFilter = "all")">All</button>
+                            <button class="gh-filter-btn @(_indexFilter == "indexed" ? "active" : "")" @onclick="@(() => _indexFilter = "indexed")">Indexed</button>
+                            <button class="gh-filter-btn @(_indexFilter == "not-indexed" ? "active" : "")" @onclick="@(() => _indexFilter = "not-indexed")">Not Indexed</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -81,6 +89,11 @@
             <div class="gh-project-grid">
                 @foreach (var repo in PaginatedRepositories)
                 {
+                    var status = GetProjectStatus(repo.FullName);
+                    var project = GetProject(repo.FullName);
+                    var statusDisplay = GetStatusDisplay(status);
+                    var isIndexing = IsIndexing(repo.FullName);
+
                     <div class="gh-project-card" style="cursor: pointer;" @onclick="() => NavigateToProject(repo)">
                         <div class="gh-project-card-header">
                             <div class="gh-project-card-icon" style="@(repo.IsPrivate ? "background: rgba(210, 153, 34, 0.15); color: var(--color-attention-fg);" : "background: rgba(47, 129, 247, 0.15); color: var(--color-accent-fg);")">
@@ -125,6 +138,28 @@
                                     <span style="font-size: 12px; font-weight: 500;">@repo.ForkCount</span>
                                 </div>
                             </div>
+
+                            @* Index Status *@
+                            <div style="margin-top: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
+                                @if (isIndexing)
+                                {
+                                    <div style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(210, 153, 34, 0.1); border-radius: 6px;">
+                                        <MudProgressCircular Indeterminate="true" Size="Size.Small" Style="width: 14px; height: 14px;" />
+                                        <span style="font-size: 12px; color: var(--color-attention-fg);">Indexing...</span>
+                                    </div>
+                                }
+                                else if (status.HasValue)
+                                {
+                                    <div style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--color-canvas-subtle); border-radius: 6px;">
+                                        <MudIcon Icon="@statusDisplay.Icon" Size="Size.Small" Style="@($"color: {statusDisplay.Color}; font-size: 14px;")" />
+                                        <span style="font-size: 12px; color: @statusDisplay.Color;">@statusDisplay.Text</span>
+                                    </div>
+                                    @if (project != null && project.ChunkCount > 0)
+                                    {
+                                        <span class="text-muted" style="font-size: 11px;">@project.ChunkCount chunks</span>
+                                    }
+                                }
+                            </div>
                         </div>
 
                         <div class="gh-project-card-footer">
@@ -132,7 +167,19 @@
                                 <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
                                 Updated @FormatDate(repo.PushedAt ?? repo.UpdatedAt)
                             </div>
-                            <span class="text-accent" style="font-size: 12px; font-weight: 500;">View Details</span>
+                            <div style="display: flex; gap: var(--space-2); align-items: center;">
+                                @if (!isIndexing && status != ProjectStatusDto.Indexing)
+                                {
+                                    <button class="gh-btn gh-btn-sm gh-btn-primary"
+                                            @onclick="() => IndexRepositoryAsync(repo)"
+                                            @onclick:stopPropagation="true"
+                                            title="@(status == ProjectStatusDto.Indexed ? "Re-index repository" : "Index repository")">
+                                        <MudIcon Icon="@(status == ProjectStatusDto.Indexed ? Icons.Material.Filled.Refresh : Icons.Material.Filled.CloudDownload)" Size="Size.Small" />
+                                        @(status == ProjectStatusDto.Indexed ? "Re-index" : "Index")
+                                    </button>
+                                }
+                                <span class="text-accent" style="font-size: 12px; font-weight: 500;">View Details</span>
+                            </div>
                         </div>
                     </div>
                 }
