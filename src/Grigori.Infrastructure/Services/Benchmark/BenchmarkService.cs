@@ -6,7 +6,7 @@ using Grigori.Contracts.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Grigori.Mcp.Features.Benchmark.Services;
+namespace Grigori.Infrastructure.Services.Benchmark;
 
 public class BenchmarkService
 {

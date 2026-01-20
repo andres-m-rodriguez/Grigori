@@ -3,7 +3,7 @@ using Grigori.Contracts.Dtos.Search;
 using Grigori.Contracts.Interfaces;
 using Grigori.Contracts.Options;
 using Grigori.Contracts.Results;
-using Grigori.Mcp.Features.Search.Services;
+using Grigori.Infrastructure.Services.Search;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

@@ -4,7 +4,7 @@ using Grigori.Contracts.Dtos.Search;
 using Grigori.Contracts.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Grigori.Mcp.Dashboard.Services;
+namespace Grigori.Dashboard.Services;
 
 public class DashboardService
 {

@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Grigori.Mcp.Features.Search.Services;
+namespace Grigori.Infrastructure.Services.Search;
 
 /// <summary>
 /// BM25 (Okapi BM25) implementation for lexical scoring of code chunks.

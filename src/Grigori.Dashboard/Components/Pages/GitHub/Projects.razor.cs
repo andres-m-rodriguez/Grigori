@@ -2,7 +2,7 @@ using Grigori.Contracts.Dtos.GitHub;
 using Grigori.Contracts.Interfaces;
 using Microsoft.AspNetCore.Components;
 
-namespace Grigori.Mcp.Dashboard.Components.Pages.GitHub;
+namespace Grigori.Dashboard.Components.Pages.GitHub;
 
 public partial class Projects : ComponentBase
 {

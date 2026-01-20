@@ -1,6 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
-using Grigori.Mcp.Features.Benchmark.Services;
+using Grigori.Infrastructure.Services.Benchmark;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 

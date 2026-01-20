@@ -6,6 +6,9 @@ using Grigori.Infrastructure.Embeddings;
 using Grigori.Infrastructure.FileWatching;
 using Grigori.Infrastructure.GitHub;
 using Grigori.Infrastructure.Metrics;
+using Grigori.Infrastructure.Services.Benchmark;
+using Grigori.Infrastructure.Services.Index;
+using Grigori.Infrastructure.Services.Search;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Grigori.Infrastructure.Extensions;
@@ -47,6 +50,11 @@ public static class ServiceCollectionExtensions
                 _ => ActivatorUtilities.CreateInstance<GrpcEmbeddingProvider>(sp)
             };
         });
+
+        // Feature services
+        services.AddSingleton<ISearchService, SearchService>();
+        services.AddSingleton<IIndexService, IndexService>();
+        services.AddSingleton<BenchmarkService>();
 
         return services;
     }
