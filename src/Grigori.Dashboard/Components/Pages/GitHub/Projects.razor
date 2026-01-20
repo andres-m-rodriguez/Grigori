@@ -3,139 +3,150 @@
 
 <PageTitle>GitHub Projects - Grigori</PageTitle>
 
-<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
-    <MudText Typo="Typo.h4">GitHub Projects</MudText>
+<div class="gh-page-header">
+    <div>
+        <h1 class="gh-page-title">GitHub Projects</h1>
+        <p class="gh-page-subtitle">Your repositories and activity</p>
+    </div>
     @if (GitHubService.IsAuthenticated && _user != null)
     {
-        <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">
+        <span class="gh-label success">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" />
             @_user.Login
-        </MudChip>
+        </span>
     }
-</MudStack>
+</div>
 
 <GitHubAuthRequired FeatureDescription="Connect your GitHub account to view your repositories and track activity.">
     @if (_loading)
     {
-        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        <div class="gh-loading">
+            <MudProgressCircular Indeterminate="true" Size="Size.Medium" />
+        </div>
     }
     else
     {
-        <MudPaper Elevation="1" Class="pa-4 mb-4">
-            <MudGrid Spacing="2">
-                <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_searchQuery"
-                                  Placeholder="Search repositories..."
-                                  Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.Search"
-                                  Immediate="true"
-                                  DebounceInterval="300"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
-                </MudItem>
-                <MudItem xs="6" md="3">
-                    <MudSelect T="string" @bind-Value="_languageFilter"
-                               Label="Language"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                               Clearable="true">
-                        @foreach (var lang in Languages)
-                        {
-                            <MudSelectItem Value="@lang">@lang</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-                <MudItem xs="6" md="3">
-                    <MudSelect T="string" @bind-Value="_visibilityFilter"
-                               Label="Visibility"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense">
-                        <MudSelectItem Value="@("all")">All</MudSelectItem>
-                        <MudSelectItem Value="@("public")">Public</MudSelectItem>
-                        <MudSelectItem Value="@("private")">Private</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
-            </MudGrid>
-        </MudPaper>
+        @* Filters *@
+        <div class="gh-box" style="margin-bottom: var(--space-4);">
+            <div class="gh-box-body">
+                <div style="display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: flex-end;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <label class="text-muted" style="display: block; margin-bottom: 6px; font-size: 12px;">Search</label>
+                        <input type="text"
+                               class="gh-search-input"
+                               placeholder="Search repositories..."
+                               @bind="_searchQuery"
+                               @bind:event="oninput" />
+                    </div>
+                    <div style="min-width: 150px;">
+                        <MudSelect T="string" @bind-Value="_languageFilter"
+                                   Placeholder="Language"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   Clearable="true"
+                                   Dense="true">
+                            @foreach (var lang in Languages)
+                            {
+                                <MudSelectItem Value="@lang">@lang</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                    <div style="min-width: 120px;">
+                        <div class="gh-filter-group">
+                            <button class="gh-filter-btn @(_visibilityFilter == "all" ? "active" : "")" @onclick="@(() => _visibilityFilter = "all")">All</button>
+                            <button class="gh-filter-btn @(_visibilityFilter == "public" ? "active" : "")" @onclick="@(() => _visibilityFilter = "public")">Public</button>
+                            <button class="gh-filter-btn @(_visibilityFilter == "private" ? "active" : "")" @onclick="@(() => _visibilityFilter = "private")">Private</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         @if (FilteredRepositories.Count == 0)
         {
-            <MudAlert Severity="Severity.Info">
-                No repositories found matching your criteria.
-            </MudAlert>
+            <div class="gh-empty-state">
+                <div class="gh-empty-state-icon">
+                    <MudIcon Icon="@Icons.Material.Filled.FolderOff" Style="font-size: inherit;" />
+                </div>
+                <div class="gh-empty-state-title">No repositories found</div>
+                <div class="gh-empty-state-text">No repositories match your current filters.</div>
+            </div>
         }
         else
         {
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                Showing @PaginatedRepositories.Count of @FilteredRepositories.Count repositories
-            </MudText>
+            <div style="margin-bottom: var(--space-3);">
+                <span class="text-muted">Showing @PaginatedRepositories.Count of @FilteredRepositories.Count repositories</span>
+            </div>
 
-            <MudGrid Spacing="3">
+            <div class="gh-project-grid">
                 @foreach (var repo in PaginatedRepositories)
                 {
-                    <MudItem xs="12" sm="6" lg="4">
-                        <MudCard Elevation="1" Class="cursor-pointer" @onclick="() => NavigateToProject(repo)">
-                            <MudCardHeader>
-                                <CardHeaderAvatar>
-                                    <MudIcon Icon="@(repo.IsPrivate ? Icons.Material.Filled.Lock : Icons.Material.Filled.Public)"
-                                             Color="@(repo.IsPrivate ? Color.Warning : Color.Info)" />
-                                </CardHeaderAvatar>
-                                <CardHeaderContent>
-                                    <MudText Typo="Typo.subtitle1">@repo.Name</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@repo.FullName</MudText>
-                                </CardHeaderContent>
-                                <CardHeaderActions>
-                                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
-                                                   Size="Size.Small"
-                                                   Href="@repo.HtmlUrl"
-                                                   Target="_blank" />
-                                </CardHeaderActions>
-                            </MudCardHeader>
-                            <MudCardContent>
-                                @if (!string.IsNullOrEmpty(repo.Description))
+                    <div class="gh-project-card" style="cursor: pointer;" @onclick="() => NavigateToProject(repo)">
+                        <div class="gh-project-card-header">
+                            <div class="gh-project-card-icon" style="@(repo.IsPrivate ? "background: rgba(210, 153, 34, 0.15); color: var(--color-attention-fg);" : "background: rgba(47, 129, 247, 0.15); color: var(--color-accent-fg);")">
+                                <MudIcon Icon="@(repo.IsPrivate ? Icons.Material.Filled.Lock : Icons.Material.Filled.Public)" />
+                            </div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="gh-project-name">@repo.Name</div>
+                                <div class="text-muted" style="font-size: 12px;">@repo.FullName</div>
+                            </div>
+                            <a href="@repo.HtmlUrl" target="_blank" class="gh-btn gh-btn-sm" @onclick:stopPropagation="true">
+                                <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" />
+                            </a>
+                        </div>
+
+                        <div class="gh-project-card-body">
+                            @if (!string.IsNullOrEmpty(repo.Description))
+                            {
+                                <p class="text-muted" style="font-size: 13px; margin-bottom: var(--space-3); line-height: 1.5;">
+                                    @TruncateDescription(repo.Description)
+                                </p>
+                            }
+                            else
+                            {
+                                <p class="text-subtle" style="font-size: 13px; margin-bottom: var(--space-3); font-style: italic;">
+                                    No description
+                                </p>
+                            }
+
+                            <div class="gh-project-stats">
+                                @if (!string.IsNullOrEmpty(repo.Language))
                                 {
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                                        @TruncateDescription(repo.Description)
-                                    </MudText>
+                                    <div class="gh-project-stat-box" style="padding: 6px 10px;">
+                                        <span style="font-size: 12px; font-weight: 500; color: var(--color-accent-fg);">@repo.Language</span>
+                                    </div>
                                 }
-                                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
-                                    @if (!string.IsNullOrEmpty(repo.Language))
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
-                                            @repo.Language
-                                        </MudChip>
-                                    }
-                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.Star">
-                                        @repo.StarCount
-                                    </MudChip>
-                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.CallSplit">
-                                        @repo.ForkCount
-                                    </MudChip>
-                                </MudStack>
-                            </MudCardContent>
-                            <MudCardActions>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    Updated @FormatDate(repo.PushedAt ?? repo.UpdatedAt)
-                                </MudText>
-                                <MudSpacer />
-                                <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Text"
-                                           OnClick="() => NavigateToProject(repo)">
-                                    View Details
-                                </MudButton>
-                            </MudCardActions>
-                        </MudCard>
-                    </MudItem>
+                                <div class="gh-project-stat-box" style="padding: 6px 10px; flex-direction: row; gap: 4px; align-items: center;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Style="color: var(--color-attention-fg);" />
+                                    <span style="font-size: 12px; font-weight: 500;">@repo.StarCount</span>
+                                </div>
+                                <div class="gh-project-stat-box" style="padding: 6px 10px; flex-direction: row; gap: 4px; align-items: center;">
+                                    <MudIcon Icon="@Icons.Material.Filled.CallSplit" Size="Size.Small" Style="color: var(--color-fg-muted);" />
+                                    <span style="font-size: 12px; font-weight: 500;">@repo.ForkCount</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="gh-project-card-footer">
+                            <div class="gh-project-time">
+                                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+                                Updated @FormatDate(repo.PushedAt ?? repo.UpdatedAt)
+                            </div>
+                            <span class="text-accent" style="font-size: 12px; font-weight: 500;">View Details</span>
+                        </div>
+                    </div>
                 }
-            </MudGrid>
+            </div>
 
             @if (FilteredRepositories.Count > PageSize)
             {
-                <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
+                <div style="display: flex; justify-content: center; margin-top: var(--space-4);">
                     <MudPagination Count="@TotalPages"
                                    Selected="_currentPage"
                                    SelectedChanged="OnPageChanged"
                                    Color="Color.Primary"
                                    Variant="Variant.Filled" />
-                </MudStack>
+                </div>
             }
         }
     }
