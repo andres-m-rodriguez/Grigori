@@ -33,6 +33,7 @@ public static class ServiceCollectionExtensions
         // GitHub integration (singleton for token state management)
         services.AddHttpClient("GitHub");
         services.AddSingleton<IGitHubService, GitHubService>();
+        services.AddSingleton<IGitHubIndexingService, GitHubIndexingService>();
 
         // Note: HNSW index removed - using pgvector for vector similarity search
 
