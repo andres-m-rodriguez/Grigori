@@ -2,6 +2,8 @@
 @using Grigori.Contracts.Dtos.Dashboard
 @using Grigori.Contracts.Dtos.Metrics
 @inject DashboardService DashboardService
+@inject PersistentComponentState ApplicationState
+@implements IDisposable
 
 <PageTitle>Dashboard - Grigori</PageTitle>
 
@@ -274,6 +276,8 @@ else
     private List<SearchHistoryDto> _searchHistory = [];
     private List<PerformanceDataPointDto> _performanceData = [];
     private bool _loading = true;
+    private bool _dataLoaded = false;
+    private PersistingComponentStateSubscription _persistingSubscription;
 
     // Chart data
     private List<ChartSeries> _chartSeries = [];
@@ -286,11 +290,43 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadStatsAsync();
+        _persistingSubscription = ApplicationState.RegisterOnPersisting(PersistData);
+
+        // Try to restore from persisted state (avoids double-fetch during prerender)
+        if (ApplicationState.TryTakeFromJson<DashboardState>("dashboard-state", out var restored) && restored != null)
+        {
+            _stats = restored.Stats;
+            _projects = restored.Projects ?? [];
+            _activityLogs = restored.ActivityLogs ?? [];
+            _searchHistory = restored.SearchHistory ?? [];
+            _performanceData = restored.PerformanceData ?? [];
+            _dataLoaded = true;
+            _loading = false;
+            PrepareChartData();
+        }
+        else
+        {
+            await LoadStatsAsync();
+        }
+    }
+
+    private Task PersistData()
+    {
+        ApplicationState.PersistAsJson("dashboard-state", new DashboardState
+        {
+            Stats = _stats,
+            Projects = _projects,
+            ActivityLogs = _activityLogs,
+            SearchHistory = _searchHistory,
+            PerformanceData = _performanceData
+        });
+        return Task.CompletedTask;
     }
 
     private async Task LoadStatsAsync()
     {
+        if (_dataLoaded) return;
+
         _loading = true;
         try
         {
@@ -308,6 +344,7 @@ else
             _activityLogs = activityTask.Result;
             _searchHistory = searchHistoryTask.Result;
             _performanceData = performanceTask.Result;
+            _dataLoaded = true;
 
             // Prepare chart data
             PrepareChartData();
@@ -339,5 +376,19 @@ else
                 Data = _performanceData.Select(p => p.AvgIndexTimeMs).ToArray()
             }
         ];
+    }
+
+    public void Dispose()
+    {
+        _persistingSubscription.Dispose();
+    }
+
+    private class DashboardState
+    {
+        public IndexStatsDto? Stats { get; set; }
+        public List<IndexedProjectDto>? Projects { get; set; }
+        public List<ActivityLogDto>? ActivityLogs { get; set; }
+        public List<SearchHistoryDto>? SearchHistory { get; set; }
+        public List<PerformanceDataPointDto>? PerformanceData { get; set; }
     }
 }
