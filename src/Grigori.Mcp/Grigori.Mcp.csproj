@@ -26,6 +26,9 @@
 
     <!-- Trim settings - disabled due to ONNX Runtime reflection usage -->
     <PublishTrimmed>false</PublishTrimmed>
+
+    <!-- No static web assets needed for MCP server -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
   </PropertyGroup>
 
   <ItemGroup>
