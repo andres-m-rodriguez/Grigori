@@ -4,40 +4,28 @@ using Grigori.Contracts.Options;
 using Grigori.Dashboard.Components;
 using Grigori.Dashboard.Services;
 using Grigori.Database;
-using Grigori.Database.Extensions;
 using Grigori.DataAccess.Extensions;
 using Grigori.Infrastructure.Extensions;
 using Grigori.Infrastructure.Services.Benchmark;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
+using Grigori.Api;
 
-// Determine the application directory
-var processPath = Environment.ProcessPath;
-var isSingleFile = processPath != null &&
-    !processPath.EndsWith("dotnet", StringComparison.OrdinalIgnoreCase) &&
-    !processPath.EndsWith("dotnet.exe", StringComparison.OrdinalIgnoreCase);
+var builder = WebApplication.CreateBuilder(args);
 
-var appDir = isSingleFile
-    ? Path.GetDirectoryName(processPath)!
-    : AppContext.BaseDirectory;
+// Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
 
-var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+// Add Aspire PostgreSQL EF Core integration (gets connection string from Aspire)
+builder.AddNpgsqlDbContext<GrigoriDbContext>("grigori", configureDbContextOptions: options =>
 {
-    Args = args,
-    ContentRootPath = appDir,
-    WebRootPath = Path.Combine(appDir, "wwwroot")
+    options.UseNpgsql(npgsqlOptions => npgsqlOptions.UseVector());
 });
-
-// Add configuration
-var projectDir = AppContext.BaseDirectory;
-builder.Configuration.AddJsonFile(Path.Combine(projectDir, "appsettings.json"), optional: true);
-builder.Configuration.AddEnvironmentVariables();
 
 // Configure options
 builder.Services.Configure<GrigoriOptions>(builder.Configuration.GetSection(GrigoriOptions.SectionName));
 
-// Add layers following dependency graph
-builder.Services.AddGrigoriDatabase();         // Database layer
+// Add layers following dependency graph (skip database - already added via Aspire)
 builder.Services.AddGrigoriDataAccess();       // DataAccess layer
 builder.Services.AddGrigoriInfrastructure();   // Infrastructure layer (includes SearchService, IndexService)
 
@@ -79,6 +67,9 @@ app.UseCors();
 // ============================================================================
 // REST API Endpoints
 // ============================================================================
+
+// Map Aspire default endpoints (health, alive)
+app.MapDefaultEndpoints();
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
     .WithTags("Health");
@@ -233,35 +224,20 @@ app.MapDelete("/api/projects/{id:long}", async (long id, IProjectRepository proj
     );
 }).WithTags("Projects");
 
-// ============================================================================
-// Dashboard (Blazor)
-// ============================================================================
 
 app.UseRouting();
 app.UseStaticFiles();
+app.MapStaticAssets();
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AddAdditionalAssemblies(typeof(Routes).Assembly);
 
-// ============================================================================
-// Startup
-// ============================================================================
+await app.RunAsync();
 
-await app.StartAsync();
-var urls = app.Urls.ToList();
-var baseUrl = urls.FirstOrDefault() ?? "http://localhost:5000";
 
-Console.WriteLine($"Grigori API Server started");
-Console.WriteLine($"  Dashboard: {baseUrl}");
-Console.WriteLine($"  API:       {baseUrl}/api");
-Console.WriteLine($"  Health:    {baseUrl}/api/health");
 
-await app.WaitForShutdownAsync();
-
-// ============================================================================
-// Request DTOs
-// ============================================================================
 
 record SearchRequest(string Query, int? Limit, string? FileTypes, string? OutputMode);
 record IndexRequest(string Path);

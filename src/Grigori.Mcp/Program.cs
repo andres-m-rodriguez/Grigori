@@ -1,7 +1,6 @@
 using Grigori.Contracts.Interfaces;
 using Grigori.Contracts.Options;
 using Grigori.Database;
-using Grigori.Database.Extensions;
 using Grigori.DataAccess.Extensions;
 using Grigori.Infrastructure.Extensions;
 using Grigori.Mcp.Features.Benchmark.Endpoints;
@@ -11,21 +10,7 @@ using Grigori.Mcp.Features.Search.Endpoints;
 using Microsoft.EntityFrameworkCore;
 using ModelContextProtocol.Server;
 
-// Determine the application directory
-var processPath = Environment.ProcessPath;
-var isSingleFile = processPath != null &&
-    !processPath.EndsWith("dotnet", StringComparison.OrdinalIgnoreCase) &&
-    !processPath.EndsWith("dotnet.exe", StringComparison.OrdinalIgnoreCase);
-
-var appDir = isSingleFile
-    ? Path.GetDirectoryName(processPath)!
-    : AppContext.BaseDirectory;
-
-var builder = WebApplication.CreateBuilder(new WebApplicationOptions
-{
-    Args = args,
-    ContentRootPath = appDir
-});
+var builder = WebApplication.CreateBuilder(args);
 
 // Check run mode
 var mcpMode = args.Contains("--mcp");           // stdio MCP mode (for local use)
@@ -35,16 +20,19 @@ var mcpHttpMode = args.Contains("--mcp-http");  // HTTP MCP mode (for remote AI 
 if (!mcpMode)
     mcpHttpMode = true;
 
-// Add configuration
-var projectDir = AppContext.BaseDirectory;
-builder.Configuration.AddJsonFile(Path.Combine(projectDir, "appsettings.json"), optional: true);
-builder.Configuration.AddEnvironmentVariables();
+// Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
+// Add Aspire PostgreSQL EF Core integration (gets connection string from Aspire)
+builder.AddNpgsqlDbContext<GrigoriDbContext>("grigori", configureDbContextOptions: options =>
+{
+    options.UseNpgsql(npgsqlOptions => npgsqlOptions.UseVector());
+});
 
 // Configure options
 builder.Services.Configure<GrigoriOptions>(builder.Configuration.GetSection(GrigoriOptions.SectionName));
 
-// Add layers following dependency graph
-builder.Services.AddGrigoriDatabase();         // Database layer
+// Add layers following dependency graph (skip database - already added via Aspire)
 builder.Services.AddGrigoriDataAccess();       // DataAccess layer
 builder.Services.AddGrigoriInfrastructure();   // Infrastructure layer (includes services)
 
@@ -93,7 +81,10 @@ if (mcpHttpMode)
     app.MapMcp("/mcp");
 }
 
-// Health endpoint for container orchestration
+// Map Aspire default endpoints (health, alive)
+app.MapDefaultEndpoints();
+
+// Legacy health endpoint for container orchestration
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
 // ============================================================================

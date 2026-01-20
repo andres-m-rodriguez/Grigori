@@ -6,21 +6,58 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Grigori.Api</RootNamespace>
 
-    <!-- Container optimization -->
-    <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>true</SelfContained>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-
-    <!-- Runtime identifiers for cross-platform builds -->
-    <RuntimeIdentifiers>linux-x64;linux-arm64;win-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
-
-    <!-- Trim settings - disabled due to ONNX Runtime reflection usage -->
-    <PublishTrimmed>false</PublishTrimmed>
-
     <!-- Static web assets for Blazor -->
     <StaticWebAssetsSelfContained>true</StaticWebAssetsSelfContained>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\cs\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\de\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\es\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\fr\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\it\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\ja\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\ko\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\Microsoft.Build.Locator.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.exe" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.exe.config" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\Microsoft.IO.Redist.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\Newtonsoft.Json.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\pl\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\pt-BR\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\ru\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\System.Buffers.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\System.Collections.Immutable.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\System.CommandLine.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\System.Memory.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\System.Numerics.Vectors.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\System.Runtime.CompilerServices.Unsafe.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\System.Threading.Tasks.Extensions.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\tr\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\zh-Hans\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-net472\zh-Hant\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\cs\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\de\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\es\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\fr\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\it\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\ja\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\ko\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\Microsoft.Build.Locator.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.deps.json" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.dll.config" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.runtimeconfig.json" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\Newtonsoft.Json.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\pl\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\pt-BR\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\ru\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\System.Collections.Immutable.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\System.CommandLine.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\tr\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\zh-Hans\System.CommandLine.resources.dll" />
+    <Content Remove="C:\Users\Overlord\.nuget\packages\microsoft.codeanalysis.workspaces.msbuild\4.14.0\contentFiles\any\any\BuildHost-netcore\zh-Hant\System.CommandLine.resources.dll" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Grigori.Contracts\Grigori.Contracts.csproj" />
@@ -28,9 +65,12 @@
     <ProjectReference Include="..\Grigori.Database\Grigori.Database.csproj" />
     <ProjectReference Include="..\Grigori.DataAccess\Grigori.DataAccess.csproj" />
     <ProjectReference Include="..\Grigori.Infrastructure\Grigori.Infrastructure.csproj" />
+    <ProjectReference Include="..\Grigori.ServiceDefaults\Grigori.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+	<PackageReference Include="MudBlazor" Version="8.15.0" />
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.0.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
