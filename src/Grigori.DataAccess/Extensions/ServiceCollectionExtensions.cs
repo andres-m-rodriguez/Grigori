@@ -8,10 +8,11 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddGrigoriDataAccess(this IServiceCollection services)
     {
-        services.AddSingleton<IChunkRepository, ChunkRepository>();
-        services.AddSingleton<IMetricsRepository, MetricsRepository>();
-        services.AddSingleton<IDashboardRepository, DashboardRepository>();
-        services.AddSingleton<IProjectRepository, ProjectRepository>();
+        // Repositories must be Scoped to match DbContext lifetime
+        services.AddScoped<IChunkRepository, ChunkRepository>();
+        services.AddScoped<IMetricsRepository, MetricsRepository>();
+        services.AddScoped<IDashboardRepository, DashboardRepository>();
+        services.AddScoped<IProjectRepository, ProjectRepository>();
         return services;
     }
 }
