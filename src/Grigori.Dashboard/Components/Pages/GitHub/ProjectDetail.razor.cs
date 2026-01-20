@@ -3,7 +3,7 @@ using Grigori.Contracts.Interfaces;
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 
-namespace Grigori.Mcp.Dashboard.Components.Pages.GitHub;
+namespace Grigori.Dashboard.Components.Pages.GitHub;
 
 public partial class ProjectDetail : ComponentBase
 {

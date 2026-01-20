@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Grigori.Contracts/Grigori.Contracts.csproj" />
     <Project Path="src/Grigori.Database/Grigori.Database.csproj" />
+    <Project Path="src/Grigori.Dashboard/Grigori.Dashboard.csproj" />
     <Project Path="src/Grigori.DataAccess/Grigori.DataAccess.csproj" />
     <Project Path="src/Grigori.Infrastructure/Grigori.Infrastructure.csproj" />
     <Project Path="src/Grigori.Mcp/Grigori.Mcp.csproj" />

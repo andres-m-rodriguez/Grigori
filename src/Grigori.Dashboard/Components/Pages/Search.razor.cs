@@ -1,11 +1,11 @@
 using Grigori.Contracts.Dtos.Dashboard;
-using Grigori.Mcp.Dashboard.Services;
+using Grigori.Dashboard.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using MudBlazor;
 
-namespace Grigori.Mcp.Dashboard.Components.Pages;
+namespace Grigori.Dashboard.Components.Pages;
 
 public partial class Search : ComponentBase, IAsyncDisposable
 {
