@@ -1,0 +1,61 @@
+@page "/activity/hotspots"
+
+<PageTitle>Hot Spots - Grigori</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Hot Spots</MudText>
+
+<GitHubAuthRequired FeatureDescription="Connect your GitHub account to identify the most frequently changed files and code areas in your repositories.">
+    <MudAlert Severity="Severity.Info" Class="mb-4">
+        Hot Spots analysis feature coming soon. This page will highlight areas of high activity in your codebase.
+    </MudAlert>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="1" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Whatshot" Class="mr-2" Color="Color.Warning" />
+                    Most Changed Files
+                </MudText>
+                <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+                    Files with the highest commit frequency over time. These often indicate areas that may need refactoring or additional attention.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="1" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.BugReport" Class="mr-2" Color="Color.Error" />
+                    Bug-Prone Areas
+                </MudText>
+                <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+                    Code areas with frequent bug fixes based on commit message analysis.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="1" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Group" Class="mr-2" Color="Color.Info" />
+                    Collaboration Zones
+                </MudText>
+                <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+                    Files modified by multiple contributors, potential coordination points.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="1" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Class="mr-2" Color="Color.Success" />
+                    Growth Trends
+                </MudText>
+                <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+                    Files and directories growing fastest over time.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</GitHubAuthRequired>

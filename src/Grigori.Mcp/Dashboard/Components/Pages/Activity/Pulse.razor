@@ -1,0 +1,75 @@
+@page "/activity/pulse"
+
+<PageTitle>Project Pulse - Grigori</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Project Pulse</MudText>
+
+<GitHubAuthRequired FeatureDescription="Connect your GitHub account to monitor repository health and activity indicators across your projects.">
+    <MudAlert Severity="Severity.Info" Class="mb-4">
+        Project Pulse feature coming soon. This page will provide health and activity indicators for your repositories.
+    </MudAlert>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="1" Class="pa-4" Style="text-align: center;">
+                <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
+                <MudText Typo="Typo.h6">Velocity</MudText>
+                <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+                    Commits per day/week trends
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="1" Class="pa-4" Style="text-align: center;">
+                <MudIcon Icon="@Icons.Material.Filled.Healing" Size="Size.Large" Color="Color.Success" Class="mb-2" />
+                <MudText Typo="Typo.h6">Health Score</MudText>
+                <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+                    PR merge rate, issue resolution
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="1" Class="pa-4" Style="text-align: center;">
+                <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+                <MudText Typo="Typo.h6">Contributors</MudText>
+                <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+                    Active contributors this period
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudPaper Elevation="1" Class="pa-4 mt-4">
+        <MudText Typo="Typo.h6" Class="mb-3">Planned Indicators</MudText>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6">
+                <MudList T="string" Dense="true">
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                        Commit frequency trends
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                        PR review turnaround time
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                        Issue open/close ratio
+                    </MudListItem>
+                </MudList>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudList T="string" Dense="true">
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                        Code churn analysis
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                        Branch lifecycle tracking
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                        Release cadence metrics
+                    </MudListItem>
+                </MudList>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+</GitHubAuthRequired>
