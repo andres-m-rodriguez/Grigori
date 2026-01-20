@@ -27,7 +27,7 @@ app.MapGet("/health", (OnnxEmbeddingGenerator generator) =>
 });
 
 Console.WriteLine("Grigori Embedding Service starting...");
-Console.WriteLine("  gRPC: http://0.0.0.0:50051");
-Console.WriteLine("  Health: http://0.0.0.0:50051/health");
+Console.WriteLine("  gRPC: http://0.0.0.0:50051 (HTTP/2)");
+Console.WriteLine("  Health: http://0.0.0.0:8080/health (HTTP/1.1)");
 
 app.Run();
