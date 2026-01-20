@@ -2,118 +2,116 @@
 
 <PageTitle>Search - Grigori</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Code Search</MudText>
+<div class="gh-page-header">
+    <div>
+        <h1 class="gh-page-title">Code Search</h1>
+        <p class="gh-page-subtitle">Search your indexed codebases</p>
+    </div>
+</div>
 
-@* Search Input *@
-<MudPaper Elevation="1" Class="pa-4 mb-4">
-    <MudStack Spacing="3">
-        <MudTextField T="string"
-                      Value="_query"
-                      ValueChanged="OnQueryChanged"
-                      Placeholder="@GetSearchPlaceholder()"
-                      Variant="Variant.Outlined"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      Immediate="true"
-                      OnKeyDown="HandleKeyDown"
-                      FullWidth="true"
-                      Clearable="true" />
-        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">Search Mode:</MudText>
-            <MudToggleGroup T="string" Value="_searchMode" ValueChanged="OnSearchModeChanged" Size="Size.Small" Color="Color.Primary">
-                <MudToggleItem Value="@("hybrid")">
-                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" />
-                        <MudText Typo="Typo.body2">Hybrid</MudText>
-                    </MudStack>
-                </MudToggleItem>
-                <MudToggleItem Value="@("semantic")">
-                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                        <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" />
-                        <MudText Typo="Typo.body2">Semantic</MudText>
-                    </MudStack>
-                </MudToggleItem>
-                <MudToggleItem Value="@("lexical")">
-                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                        <MudIcon Icon="@Icons.Material.Filled.TextFields" Size="Size.Small" />
-                        <MudText Typo="Typo.body2">Lexical</MudText>
-                    </MudStack>
-                </MudToggleItem>
-            </MudToggleGroup>
+@* Search Box *@
+<div class="gh-box" style="margin-bottom: var(--space-4);">
+    <div class="gh-box-body">
+        <div class="gh-search-box" style="margin-bottom: var(--space-3);">
+            <input type="text"
+                   class="gh-search-input"
+                   placeholder="@GetSearchPlaceholder()"
+                   @bind="_query"
+                   @bind:event="oninput"
+                   @onkeydown="HandleKeyDown" />
+            <button class="gh-btn gh-btn-primary" @onclick="() => RunSearchAsync()" disabled="@(_isSearching || string.IsNullOrWhiteSpace(_query))">
+                <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Small" />
+                Search
+            </button>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;">
+            <span class="text-muted">Mode:</span>
+            <div class="gh-filter-group">
+                <button class="gh-filter-btn @(_searchMode == "hybrid" ? "active" : "")" @onclick="@(() => OnSearchModeChanged("hybrid"))">
+                    <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" Style="vertical-align: middle; margin-right: 4px;" />
+                    Hybrid
+                </button>
+                <button class="gh-filter-btn @(_searchMode == "semantic" ? "active" : "")" @onclick="@(() => OnSearchModeChanged("semantic"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" Style="vertical-align: middle; margin-right: 4px;" />
+                    Semantic
+                </button>
+                <button class="gh-filter-btn @(_searchMode == "lexical" ? "active" : "")" @onclick="@(() => OnSearchModeChanged("lexical"))">
+                    <MudIcon Icon="@Icons.Material.Filled.TextFields" Size="Size.Small" Style="vertical-align: middle; margin-right: 4px;" />
+                    Lexical
+                </button>
+            </div>
             <MudTooltip Text="@GetSearchModeTooltip()">
-                <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Style="color: var(--mud-palette-text-secondary); cursor: help;" />
+                <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Style="color: var(--color-fg-subtle); cursor: help;" />
             </MudTooltip>
-        </MudStack>
-    </MudStack>
-</MudPaper>
+        </div>
+    </div>
+</div>
 
 @* Filters *@
 @if (_results != null && _results.Count > 0)
 {
-    <MudPaper Elevation="0" Class="pa-3 mb-4" Style="background: var(--mud-palette-background-grey);">
-        <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
-            <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
-                <MudIcon Icon="@Icons.Material.Filled.FilterList" Size="Size.Small" Class="mr-1" />
-                Filters:
-            </MudText>
+    <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap;">
+        <span class="text-muted" style="display: flex; align-items: center; gap: 4px;">
+            <MudIcon Icon="@Icons.Material.Filled.FilterList" Size="Size.Small" />
+            Filters:
+        </span>
 
-            <MudSelect T="string"
-                       Value="_selectedFileType"
-                       ValueChanged="OnFileTypeChanged"
-                       Label="File Type"
-                       Variant="Variant.Outlined"
-                       Dense="true"
-                       Margin="Margin.Dense"
-                       Style="min-width: 120px;"
-                       Clearable="true">
-                @foreach (var ext in _availableFileTypes.OrderBy(x => x))
-                {
-                    <MudSelectItem Value="@ext">.@ext</MudSelectItem>
-                }
-            </MudSelect>
-
-            <MudSelect T="string"
-                       Value="_selectedProject"
-                       ValueChanged="OnProjectChanged"
-                       Label="Project"
-                       Variant="Variant.Outlined"
-                       Dense="true"
-                       Margin="Margin.Dense"
-                       Style="min-width: 150px;"
-                       Clearable="true">
-                @foreach (var project in _projects)
-                {
-                    <MudSelectItem Value="@project.Name">@project.Name</MudSelectItem>
-                }
-            </MudSelect>
-
-            @if (!string.IsNullOrEmpty(_selectedFileType) || !string.IsNullOrEmpty(_selectedProject))
+        <MudSelect T="string"
+                   Value="_selectedFileType"
+                   ValueChanged="OnFileTypeChanged"
+                   Placeholder="File type"
+                   Variant="Variant.Outlined"
+                   Dense="true"
+                   Margin="Margin.Dense"
+                   Style="min-width: 120px;"
+                   Clearable="true">
+            @foreach (var ext in _availableFileTypes.OrderBy(x => x))
             {
-                <MudButton Size="Size.Small"
-                           Variant="Variant.Text"
-                           Color="Color.Secondary"
-                           StartIcon="@Icons.Material.Filled.Clear"
-                           OnClick="ClearFilters">
-                    Clear
-                </MudButton>
+                <MudSelectItem Value="@ext">.@ext</MudSelectItem>
             }
+        </MudSelect>
 
-            <MudSpacer />
+        <MudSelect T="string"
+                   Value="_selectedProject"
+                   ValueChanged="OnProjectChanged"
+                   Placeholder="Project"
+                   Variant="Variant.Outlined"
+                   Dense="true"
+                   Margin="Margin.Dense"
+                   Style="min-width: 150px;"
+                   Clearable="true">
+            @foreach (var project in _projects)
+            {
+                <MudSelectItem Value="@project.Name">@project.Name</MudSelectItem>
+            }
+        </MudSelect>
 
-            <MudChip T="string" Icon="@GetSearchModeIcon()" Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary">
-                @_searchMode
-            </MudChip>
-            <MudChip T="string" Icon="@Icons.Material.Filled.Timer" Size="Size.Small" Variant="Variant.Text">
-                @_searchDuration.TotalMilliseconds.ToString("F0")ms
-            </MudChip>
-        </MudStack>
-    </MudPaper>
+        @if (!string.IsNullOrEmpty(_selectedFileType) || !string.IsNullOrEmpty(_selectedProject))
+        {
+            <button class="gh-btn gh-btn-sm" @onclick="ClearFilters">
+                <MudIcon Icon="@Icons.Material.Filled.Clear" Size="Size.Small" />
+                Clear
+            </button>
+        }
+
+        <div style="flex: 1;"></div>
+
+        <span class="gh-label">
+            <MudIcon Icon="@GetSearchModeIcon()" Size="Size.Small" />
+            @_searchMode
+        </span>
+        <span class="gh-label">
+            <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" />
+            @_searchDuration.TotalMilliseconds.ToString("F0")ms
+        </span>
+    </div>
 }
 
 @* Loading State *@
 @if (_isSearching)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Style="margin-bottom: var(--space-3); border-radius: var(--radius-2);" />
 }
 
 @* Results *@
@@ -121,105 +119,79 @@
 {
     @if (_filteredResults.Count > 0)
     {
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
-            <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+        <div style="margin-bottom: var(--space-3);">
+            <span class="text-muted">
                 Showing @_filteredResults.Count of @_results?.Count result(s)
                 @if (!string.IsNullOrEmpty(_selectedFileType) || !string.IsNullOrEmpty(_selectedProject))
                 {
                     <text> (filtered)</text>
                 }
-            </MudText>
-        </MudStack>
+            </span>
+        </div>
 
-        <MudStack Spacing="3">
-            @foreach (var result in _filteredResults)
-            {
-                <MudCard Elevation="2" @key="@($"{result.FilePath}:{result.StartLine}")">
-                    <MudCardHeader Class="pb-0">
-                        <CardHeaderAvatar>
-                            <MudAvatar Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
-                                <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small" />
-                            </MudAvatar>
-                        </CardHeaderAvatar>
-                        <CardHeaderContent>
-                            <MudStack Spacing="0">
-                                <MudText Typo="Typo.body1" Style="font-weight: 600;">
-                                    @result.FileName
-                                </MudText>
-                                <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary); font-family: monospace;">
-                                    @result.RelativePath
-                                </MudText>
-                            </MudStack>
-                        </CardHeaderContent>
-                        <CardHeaderActions>
-                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">
-                                    @result.LineRange
-                                </MudChip>
-                                <MudChip T="string" Size="Size.Small" Color="Color.Tertiary" Variant="Variant.Text">
-                                    .@result.FileExtension
-                                </MudChip>
-                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
-                                    @result.FormattedScore
-                                </MudChip>
-                            </MudStack>
-                        </CardHeaderActions>
-                    </MudCardHeader>
-                    <MudCardContent Class="pt-2">
-                        <div style="position: relative;">
-                            <MudTooltip Text="Copy to clipboard">
-                                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
-                                               Size="Size.Small"
-                                               Color="Color.Default"
-                                               Style="position: absolute; top: 8px; right: 8px; z-index: 1;"
-                                               OnClick="() => CopyToClipboard(result.Content)" />
-                            </MudTooltip>
-                            <MudPaper Elevation="0" Class="code-block" Style="background: var(--mud-palette-dark); border-radius: 8px; overflow: hidden;">
-                                <pre style="margin: 0; padding: 1rem; padding-right: 3rem; overflow-x: auto;"><code class="language-@result.Language" style="font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace; font-size: 0.8rem; line-height: 1.5;">@result.Content</code></pre>
-                            </MudPaper>
-                        </div>
-                    </MudCardContent>
-                    <MudCardActions Class="pt-0">
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Class="px-2 pb-2" Style="width: 100%;">
-                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text" Icon="@Icons.Material.Filled.Folder">
-                                @result.ProjectName
-                            </MudChip>
-                            <MudSpacer />
-                            <MudText Typo="Typo.caption" Style="font-family: monospace; color: var(--mud-palette-text-secondary);">
-                                @result.FilePath
-                            </MudText>
-                        </MudStack>
-                    </MudCardActions>
-                </MudCard>
-            }
-        </MudStack>
+        @foreach (var result in _filteredResults)
+        {
+            <div class="gh-result-card" @key="@($"{result.FilePath}:{result.StartLine}")">
+                <div class="gh-result-header">
+                    <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex: 1;">
+                        <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small" Style="color: var(--color-fg-muted); flex-shrink: 0;" />
+                        <span class="gh-filepath" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            @result.RelativePath
+                        </span>
+                        <span class="gh-label" style="flex-shrink: 0;">@result.LineRange</span>
+                        <span class="gh-label purple" style="flex-shrink: 0;">.@result.FileExtension</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
+                        <span class="gh-result-score">@result.FormattedScore</span>
+                        <MudTooltip Text="Copy to clipboard">
+                            <button class="gh-btn gh-btn-sm" @onclick="() => CopyToClipboard(result.Content)">
+                                <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" />
+                            </button>
+                        </MudTooltip>
+                    </div>
+                </div>
+                <div class="gh-result-body">
+                    <pre class="gh-code"><code class="language-@result.Language">@result.Content</code></pre>
+                    <div style="margin-top: var(--space-2); display: flex; align-items: center; gap: var(--space-2);">
+                        <span class="gh-label accent">
+                            <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Small" />
+                            @result.ProjectName
+                        </span>
+                        <span class="text-mono text-subtle" style="font-size: 12px;">@result.FilePath</span>
+                    </div>
+                </div>
+            </div>
+        }
     }
     else
     {
-        <MudAlert Severity="Severity.Warning" Icon="@Icons.Material.Filled.SearchOff" Variant="Variant.Outlined">
+        <div class="gh-alert warning">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Small" Style="margin-right: 8px;" />
             @if (_results?.Count > 0)
             {
-                <MudText>No results match the current filters. Try adjusting your filters.</MudText>
+                <span>No results match the current filters. Try adjusting your filters.</span>
             }
             else
             {
-                <MudText>No results found. Try a different search query.</MudText>
+                <span>No results found. Try a different search query.</span>
             }
-        </MudAlert>
+        </div>
     }
 }
 else if (!_isSearching)
 {
-    <MudPaper Elevation="0" Class="pa-8 text-center" Style="background: transparent;">
-        <MudIcon Icon="@Icons.Material.Filled.ManageSearch" Size="Size.Large" Style="font-size: 4rem; color: var(--mud-palette-primary); opacity: 0.3;" />
-        <MudText Typo="Typo.h6" Class="mt-4">Enter a query to search</MudText>
-        <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
+    <div class="gh-empty-state">
+        <div class="gh-empty-state-icon">
+            <MudIcon Icon="@Icons.Material.Filled.ManageSearch" Style="font-size: inherit;" />
+        </div>
+        <div class="gh-empty-state-title">Enter a query to search</div>
+        <div class="gh-empty-state-text">
             Use natural language to describe what you're looking for
-        </MudText>
-        <MudStack Row="true" Justify="Justify.Center" Class="mt-4" Spacing="2">
-            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => OnQueryChanged("error handling"))">error handling</MudChip>
-            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => OnQueryChanged("database connection"))">database connection</MudChip>
-            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => OnQueryChanged("authentication"))">authentication</MudChip>
-        </MudStack>
-    </MudPaper>
+        </div>
+        <div style="display: flex; justify-content: center; gap: var(--space-2); margin-top: var(--space-4);">
+            <button class="gh-btn gh-btn-sm" @onclick="@(() => SetQueryAndSearch("error handling"))">error handling</button>
+            <button class="gh-btn gh-btn-sm" @onclick="@(() => SetQueryAndSearch("database connection"))">database connection</button>
+            <button class="gh-btn gh-btn-sm" @onclick="@(() => SetQueryAndSearch("authentication"))">authentication</button>
+        </div>
+    </div>
 }

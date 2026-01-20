@@ -4,232 +4,198 @@
 @inject IGitHubService GitHubService
 @inject ISnackbar Snackbar
 
-<PageTitle>GitHub Integration - Grigori</PageTitle>
+<PageTitle>Settings - Grigori</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">GitHub Integration</MudText>
+<div class="gh-page-header">
+    <div>
+        <h1 class="gh-page-title">Settings</h1>
+        <p class="gh-page-subtitle">Configure integrations and preferences</p>
+    </div>
+</div>
 
-<MudGrid Spacing="3">
-    @* GitHub Integration Card *@
-    <MudItem xs="12" md="6">
-        <MudCard Elevation="1">
-            <MudCardHeader>
-                <CardHeaderAvatar>
-                    <MudIcon Icon="@Icons.Custom.Brands.GitHub" Size="Size.Large" />
-                </CardHeaderAvatar>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">GitHub Integration</MudText>
-                    <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
-                        Connect your GitHub account to unlock activity tracking features
-                    </MudText>
-                </CardHeaderContent>
-                <CardHeaderActions>
-                    @if (GitHubService.IsAuthenticated)
-                    {
-                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.CheckCircle">
-                            Connected
-                        </MudChip>
-                    }
-                    else
-                    {
-                        <MudChip T="string" Color="Color.Default" Size="Size.Small" Icon="@Icons.Material.Filled.LinkOff">
-                            Not Connected
-                        </MudChip>
-                    }
-                </CardHeaderActions>
-            </MudCardHeader>
-            <MudCardContent>
-                @if (GitHubService.IsAuthenticated && _user != null)
-                {
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Class="mb-4">
-                        <MudAvatar Size="Size.Large" Style="width: 64px; height: 64px;">
-                            <MudImage Src="@_user.AvatarUrl" Alt="@_user.Login" Style="width: 100%; height: 100%; object-fit: cover;" />
-                        </MudAvatar>
-                        <div>
-                            <MudText Typo="Typo.subtitle1">@(_user.Name ?? _user.Login)</MudText>
-                            <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
-                                @@@_user.Login
-                            </MudText>
-                            <MudStack Row="true" Spacing="2" Class="mt-1">
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
-                                    @_user.PublicRepos public repos
-                                </MudChip>
-                                @if (_user.PrivateRepos > 0)
-                                {
-                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
-                                        @_user.PrivateRepos private repos
-                                    </MudChip>
-                                }
-                            </MudStack>
+<div class="gh-two-col">
+    @* GitHub Integration Panel *@
+    <div class="gh-settings-panel">
+        <div class="gh-settings-header" style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                <MudIcon Icon="@Icons.Custom.Brands.GitHub" Size="Size.Small" />
+                <span class="gh-settings-title">GitHub Integration</span>
+            </div>
+            @if (GitHubService.IsAuthenticated)
+            {
+                <span class="gh-label success">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" />
+                    Connected
+                </span>
+            }
+            else
+            {
+                <span class="gh-label">
+                    <MudIcon Icon="@Icons.Material.Filled.LinkOff" Size="Size.Small" />
+                    Not Connected
+                </span>
+            }
+        </div>
+        <div class="gh-settings-body">
+            @if (GitHubService.IsAuthenticated && _user != null)
+            {
+                <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); padding: var(--space-3); background: var(--color-canvas-default); border-radius: var(--radius-2);">
+                    <MudAvatar Size="Size.Large" Style="width: 48px; height: 48px;">
+                        <MudImage Src="@_user.AvatarUrl" Alt="@_user.Login" Style="width: 100%; height: 100%; object-fit: cover;" />
+                    </MudAvatar>
+                    <div>
+                        <div style="font-weight: 600;">@(_user.Name ?? _user.Login)</div>
+                        <div class="text-muted">@@@_user.Login</div>
+                        <div style="margin-top: 4px; display: flex; gap: var(--space-2);">
+                            <span class="gh-label">@_user.PublicRepos public repos</span>
+                            @if (_user.PrivateRepos > 0)
+                            {
+                                <span class="gh-label">@_user.PrivateRepos private repos</span>
+                            }
                         </div>
-                    </MudStack>
+                    </div>
+                </div>
 
-                    <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
-                        Your GitHub account is connected. Activity features are now available.
-                    </MudAlert>
+                <div class="gh-alert success" style="margin-bottom: var(--space-3);">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Style="margin-right: 8px;" />
+                    Your GitHub account is connected. Activity features are now available.
+                </div>
 
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Error"
-                               StartIcon="@Icons.Material.Filled.LinkOff"
-                               OnClick="DisconnectGitHub"
-                               Disabled="_loading">
-                        Disconnect
-                    </MudButton>
-                }
-                else
-                {
-                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
-                        <MudText Typo="Typo.body2">
-                            To enable GitHub features, create a Personal Access Token (PAT) with the following scopes:
-                        </MudText>
-                        <MudList T="string" Dense="true" Class="mt-2">
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
-                                <code>repo</code> - Access repositories
-                            </MudListItem>
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
-                                <code>read:user</code> - Read user profile
-                            </MudListItem>
-                        </MudList>
-                    </MudAlert>
+                <button class="gh-btn" style="color: var(--color-danger-fg);" @onclick="DisconnectGitHub" disabled="@_loading">
+                    <MudIcon Icon="@Icons.Material.Filled.LinkOff" Size="Size.Small" />
+                    Disconnect
+                </button>
+            }
+            else
+            {
+                <div class="gh-alert info" style="margin-bottom: var(--space-3);">
+                    <div style="margin-bottom: var(--space-2);">
+                        To enable GitHub features, create a Personal Access Token (PAT) with these scopes:
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 4px; padding-left: var(--space-2);">
+                        <span><code>repo</code> - Access repositories</span>
+                        <span><code>read:user</code> - Read user profile</span>
+                    </div>
+                </div>
 
-                    <MudTextField @bind-Value="_tokenInput"
-                                  Label="Personal Access Token"
-                                  Variant="Variant.Outlined"
-                                  InputType="@(_showToken ? InputType.Text : InputType.Password)"
-                                  Placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                                  Adornment="Adornment.End"
-                                  AdornmentIcon="@(_showToken ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
-                                  OnAdornmentClick="() => _showToken = !_showToken"
-                                  Class="mb-3"
-                                  HelperText="Your token is stored securely on your machine" />
+                <div style="margin-bottom: var(--space-3);">
+                    <label class="text-muted" style="display: block; margin-bottom: 6px; font-size: 12px;">Personal Access Token</label>
+                    <div style="display: flex; gap: var(--space-2);">
+                        <input type="@(_showToken ? "text" : "password")"
+                               class="gh-search-input"
+                               placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                               @bind="_tokenInput"
+                               style="flex: 1;" />
+                        <button class="gh-btn" @onclick="() => _showToken = !_showToken">
+                            <MudIcon Icon="@(_showToken ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)" Size="Size.Small" />
+                        </button>
+                    </div>
+                    <span class="text-subtle" style="font-size: 12px; margin-top: 4px; display: block;">Your token is stored securely on your machine</span>
+                </div>
 
-                    <MudStack Row="true" Spacing="2">
-                        <MudButton Variant="Variant.Filled"
-                                   Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.Link"
-                                   OnClick="ConnectGitHub"
-                                   Disabled="_loading || string.IsNullOrWhiteSpace(_tokenInput)">
-                            @if (_loading)
-                            {
-                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                                <span>Connecting...</span>
-                            }
-                            else
-                            {
-                                <span>Connect</span>
-                            }
-                        </MudButton>
+                <div style="display: flex; gap: var(--space-2);">
+                    <button class="gh-btn gh-btn-primary" @onclick="ConnectGitHub" disabled="@(_loading || string.IsNullOrWhiteSpace(_tokenInput))">
+                        @if (_loading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Style="width: 16px; height: 16px;" />
+                            <span>Connecting...</span>
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Link" Size="Size.Small" />
+                            <span>Connect</span>
+                        }
+                    </button>
 
-                        <MudButton Variant="Variant.Text"
-                                   Color="Color.Info"
-                                   StartIcon="@Icons.Material.Filled.OpenInNew"
-                                   Href="https://github.com/settings/tokens/new?description=Grigori&scopes=repo,read:user"
-                                   Target="_blank">
-                            Create Token
-                        </MudButton>
-                    </MudStack>
-                }
-            </MudCardContent>
-        </MudCard>
-    </MudItem>
+                    <a href="https://github.com/settings/tokens/new?description=Grigori&scopes=repo,read:user" target="_blank" class="gh-btn">
+                        <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" />
+                        Create Token
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
 
-    @* Features Unlocked by GitHub *@
-    <MudItem xs="12" md="6">
-        <MudCard Elevation="1">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">Features</MudText>
-                    <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
-                        Features unlocked by GitHub integration
-                    </MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudList T="string" Dense="true">
-                    <MudListItem T="string">
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="width: 100%;">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.Timeline" Color="Color.Primary" />
-                                <div>
-                                    <MudText Typo="Typo.body1">Activity Feed</MudText>
-                                    <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
-                                        Recent commits, PRs, and branch activity
-                                    </MudText>
-                                </div>
-                            </MudStack>
-                            @if (GitHubService.IsAuthenticated)
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
-                            }
-                            else
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.Lock" Color="Color.Default" />
-                            }
-                        </MudStack>
-                    </MudListItem>
-                    <MudDivider />
-                    <MudListItem T="string">
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="width: 100%;">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.Whatshot" Color="Color.Warning" />
-                                <div>
-                                    <MudText Typo="Typo.body1">Hot Spots</MudText>
-                                    <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
-                                        Most frequently changed files
-                                    </MudText>
-                                </div>
-                            </MudStack>
-                            @if (GitHubService.IsAuthenticated)
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
-                            }
-                            else
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.Lock" Color="Color.Default" />
-                            }
-                        </MudStack>
-                    </MudListItem>
-                    <MudDivider />
-                    <MudListItem T="string">
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="width: 100%;">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Secondary" />
-                                <div>
-                                    <MudText Typo="Typo.body1">AI Summaries</MudText>
-                                    <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
-                                        LLM-powered change summaries
-                                    </MudText>
-                                </div>
-                            </MudStack>
-                            <MudChip T="string" Size="Size.Small" Color="Color.Info">Coming Soon</MudChip>
-                        </MudStack>
-                    </MudListItem>
-                    <MudDivider />
-                    <MudListItem T="string">
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="width: 100%;">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.MonitorHeart" Color="Color.Error" />
-                                <div>
-                                    <MudText Typo="Typo.body1">Project Pulse</MudText>
-                                    <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
-                                        Health and activity indicators
-                                    </MudText>
-                                </div>
-                            </MudStack>
-                            @if (GitHubService.IsAuthenticated)
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
-                            }
-                            else
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.Lock" Color="Color.Default" />
-                            }
-                        </MudStack>
-                    </MudListItem>
-                </MudList>
-            </MudCardContent>
-        </MudCard>
-    </MudItem>
-</MudGrid>
+    @* Features Panel *@
+    <div class="gh-settings-panel">
+        <div class="gh-settings-header">
+            <span class="gh-settings-title">Features</span>
+        </div>
+        <div class="gh-settings-body" style="padding: 0;">
+            <div class="gh-list" style="border: none; border-radius: 0;">
+                <div class="gh-list-item">
+                    <div class="gh-list-item-icon">
+                        <MudIcon Icon="@Icons.Material.Filled.Timeline" Style="color: var(--color-accent-fg);" />
+                    </div>
+                    <div class="gh-list-item-content">
+                        <div style="font-weight: 500;">Activity Feed</div>
+                        <div class="gh-list-item-meta">Recent commits, PRs, and branch activity</div>
+                    </div>
+                    <div class="gh-list-item-actions">
+                        @if (GitHubService.IsAuthenticated)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="color: var(--color-success-fg);" />
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Lock" Style="color: var(--color-fg-subtle);" />
+                        }
+                    </div>
+                </div>
+                <div class="gh-list-item">
+                    <div class="gh-list-item-icon">
+                        <MudIcon Icon="@Icons.Material.Filled.Whatshot" Style="color: var(--color-attention-fg);" />
+                    </div>
+                    <div class="gh-list-item-content">
+                        <div style="font-weight: 500;">Hot Spots</div>
+                        <div class="gh-list-item-meta">Most frequently changed files</div>
+                    </div>
+                    <div class="gh-list-item-actions">
+                        @if (GitHubService.IsAuthenticated)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="color: var(--color-success-fg);" />
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Lock" Style="color: var(--color-fg-subtle);" />
+                        }
+                    </div>
+                </div>
+                <div class="gh-list-item">
+                    <div class="gh-list-item-icon">
+                        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Style="color: var(--color-done-fg);" />
+                    </div>
+                    <div class="gh-list-item-content">
+                        <div style="font-weight: 500;">AI Summaries</div>
+                        <div class="gh-list-item-meta">LLM-powered change summaries</div>
+                    </div>
+                    <div class="gh-list-item-actions">
+                        <span class="gh-label accent">Coming Soon</span>
+                    </div>
+                </div>
+                <div class="gh-list-item">
+                    <div class="gh-list-item-icon">
+                        <MudIcon Icon="@Icons.Material.Filled.MonitorHeart" Style="color: var(--color-danger-fg);" />
+                    </div>
+                    <div class="gh-list-item-content">
+                        <div style="font-weight: 500;">Project Pulse</div>
+                        <div class="gh-list-item-meta">Health and activity indicators</div>
+                    </div>
+                    <div class="gh-list-item-actions">
+                        @if (GitHubService.IsAuthenticated)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="color: var(--color-success-fg);" />
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Lock" Style="color: var(--color-fg-subtle);" />
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 @code {
     private string _tokenInput = "";

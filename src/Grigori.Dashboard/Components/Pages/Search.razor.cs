@@ -174,6 +174,12 @@ public partial class Search : ComponentBase, IAsyncDisposable
         await JS.InvokeVoidAsync("navigator.clipboard.writeText", content);
     }
 
+    private async Task SetQueryAndSearch(string query)
+    {
+        _query = query;
+        await RunSearchAsync();
+    }
+
     public async ValueTask DisposeAsync()
     {
         _debounceTokenSource?.Cancel();

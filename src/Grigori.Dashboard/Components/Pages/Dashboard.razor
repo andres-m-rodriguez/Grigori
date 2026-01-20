@@ -5,209 +5,266 @@
 
 <PageTitle>Dashboard - Grigori</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Index Overview</MudText>
+<div class="gh-page-header">
+    <div>
+        <h1 class="gh-page-title">Dashboard</h1>
+        <p class="gh-page-subtitle">Index overview and metrics</p>
+    </div>
+</div>
 
 @if (_loading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <div class="gh-loading">
+        <MudProgressCircular Indeterminate="true" Size="Size.Medium" />
+    </div>
 }
 else if (_stats != null)
 {
-    <MudGrid Spacing="3" Class="mb-6">
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="1" Class="pa-4">
-                <MudText Typo="Typo.overline">Code Chunks</MudText>
-                <MudText Typo="Typo.h4" Color="Color.Primary">@_stats.TotalChunks.ToString("N0")</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="1" Class="pa-4">
-                <MudText Typo="Typo.overline">Files Indexed</MudText>
-                <MudText Typo="Typo.h4">@_stats.TotalFiles.ToString("N0")</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="1" Class="pa-4">
-                <MudText Typo="Typo.overline">Index Size</MudText>
-                <MudText Typo="Typo.h4">@_stats.FormattedSize</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="1" Class="pa-4">
-                <MudText Typo="Typo.overline">Vector Index</MudText>
-                <MudText Typo="Typo.h4" Color="@(_stats.VectorIndexEnabled ? Color.Success : Color.Warning)">
+    @* Stats Grid *@
+    <div class="gh-stats-grid">
+        <div class="gh-stat-card">
+            <div class="gh-stat-card-icon" style="background: rgba(47, 129, 247, 0.15); color: var(--color-accent-fg);">
+                <MudIcon Icon="@Icons.Material.Filled.DataObject" />
+            </div>
+            <div class="gh-stat-content">
+                <div class="gh-stat-value" style="color: var(--color-accent-fg);">@_stats.TotalChunks.ToString("N0")</div>
+                <div class="gh-stat-label">Code Chunks</div>
+            </div>
+        </div>
+        <div class="gh-stat-card">
+            <div class="gh-stat-card-icon" style="background: rgba(163, 113, 247, 0.15); color: var(--color-done-fg);">
+                <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" />
+            </div>
+            <div class="gh-stat-content">
+                <div class="gh-stat-value" style="color: var(--color-done-fg);">@_stats.TotalFiles.ToString("N0")</div>
+                <div class="gh-stat-label">Files Indexed</div>
+            </div>
+        </div>
+        <div class="gh-stat-card">
+            <div class="gh-stat-card-icon" style="background: rgba(210, 153, 34, 0.15); color: var(--color-attention-fg);">
+                <MudIcon Icon="@Icons.Material.Filled.Storage" />
+            </div>
+            <div class="gh-stat-content">
+                <div class="gh-stat-value" style="color: var(--color-attention-fg);">@_stats.FormattedSize</div>
+                <div class="gh-stat-label">Index Size</div>
+            </div>
+        </div>
+        <div class="gh-stat-card">
+            <div class="gh-stat-card-icon" style="background: @(_stats.VectorIndexEnabled ? "rgba(63, 185, 80, 0.15)" : "rgba(110, 118, 129, 0.15)"); color: @(_stats.VectorIndexEnabled ? "var(--color-success-fg)" : "var(--color-fg-muted)");">
+                <MudIcon Icon="@(_stats.VectorIndexEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)" />
+            </div>
+            <div class="gh-stat-content">
+                <div class="gh-stat-value" style="color: @(_stats.VectorIndexEnabled ? "var(--color-success-fg)" : "var(--color-fg-muted)");">
                     @(_stats.VectorIndexEnabled ? "Active" : "Inactive")
-                </MudText>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-
-    <MudPaper Elevation="1" Class="pa-4 mb-6">
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-            <div>
-                <MudText Typo="Typo.body2">
-                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1" />
-                    Last Updated: @_stats.FormattedLastUpdated
-                </MudText>
+                </div>
+                <div class="gh-stat-label">Vector Index</div>
             </div>
-            <div>
-                @if (_stats.VectorIndexEnabled)
-                {
-                    <MudChip T="string" Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small">
-                        pgvector: @_stats.VectorCount.ToString("N0") vectors
-                    </MudChip>
-                }
-                else
-                {
-                    <MudChip T="string" Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small">
-                        Using linear search
-                    </MudChip>
-                }
-            </div>
-        </MudStack>
-    </MudPaper>
+        </div>
+    </div>
 
+    @* Status Bar *@
+    <div class="gh-box" style="margin-bottom: var(--space-4);">
+        <div class="gh-box-body" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2);">
+            <span class="text-muted" style="display: flex; align-items: center; gap: 6px;">
+                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+                Last Updated: @_stats.FormattedLastUpdated
+            </span>
+            @if (_stats.VectorIndexEnabled)
+            {
+                <span class="gh-label success">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" />
+                    pgvector: @_stats.VectorCount.ToString("N0") vectors
+                </span>
+            }
+            else
+            {
+                <span class="gh-label warning">
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" />
+                    Using linear search
+                </span>
+            }
+        </div>
+    </div>
+
+    @* Projects Section *@
     @if (_projects.Count > 0)
     {
-        <MudText Typo="Typo.h5" Class="mb-4">Indexed Projects</MudText>
-        <MudGrid Spacing="3">
-            @foreach (var project in _projects)
-            {
-                <MudItem xs="12" sm="6" md="4">
-                    <MudCard Elevation="1">
-                        <MudCardHeader>
-                            <CardHeaderAvatar>
-                                <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" />
-                            </CardHeaderAvatar>
-                            <CardHeaderContent>
-                                <MudText Typo="Typo.h6">@project.Name</MudText>
-                                <MudText Typo="Typo.caption" Style="word-break: break-all;">@project.Path</MudText>
-                            </CardHeaderContent>
-                        </MudCardHeader>
-                        <MudCardContent>
-                            <MudStack Row="true" Spacing="4" Class="mb-2">
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
-                                    @project.FileCount.ToString("N0") files
-                                </MudChip>
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
-                                    @project.ChunkCount.ToString("N0") chunks
-                                </MudChip>
-                            </MudStack>
-                            <MudText Typo="Typo.caption" Class="mb-2" Style="font-family: monospace;">
-                                @project.ExtensionsSummary
-                            </MudText>
-                            <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
-                                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1" />
+        <div class="gh-section">
+            <div class="gh-section-header">
+                <h2 class="gh-section-title">
+                    <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Small" />
+                    Indexed Projects
+                    <span class="gh-counter">@_projects.Count</span>
+                </h2>
+            </div>
+
+            <div class="gh-project-grid">
+                @foreach (var project in _projects)
+                {
+                    <div class="gh-project-card">
+                        <div class="gh-project-card-header">
+                            <div class="gh-project-card-icon">
+                                <MudIcon Icon="@Icons.Material.Filled.Folder" />
+                            </div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="gh-project-name">@project.Name</div>
+                                <div class="gh-project-path">@project.Path</div>
+                            </div>
+                        </div>
+
+                        <div class="gh-project-card-body">
+                            <div class="gh-project-stats">
+                                <div class="gh-project-stat-box">
+                                    <span class="gh-project-stat-value files">@project.FileCount.ToString("N0")</span>
+                                    <span class="gh-project-stat-label">Files</span>
+                                </div>
+                                <div class="gh-project-stat-box">
+                                    <span class="gh-project-stat-value chunks">@project.ChunkCount.ToString("N0")</span>
+                                    <span class="gh-project-stat-label">Chunks</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="gh-project-card-footer">
+                            <div class="gh-project-extensions">
+                                @foreach (var ext in project.ExtensionsSummary.Split(", ").Take(4))
+                                {
+                                    <span class="gh-project-ext">@ext</span>
+                                }
+                                @if (project.ExtensionsSummary.Split(", ").Length > 4)
+                                {
+                                    <span class="gh-project-ext">+@(project.ExtensionsSummary.Split(", ").Length - 4)</span>
+                                }
+                            </div>
+                            <div class="gh-project-time">
+                                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
                                 @project.FormattedLastIndexed
-                            </MudText>
-                        </MudCardContent>
-                    </MudCard>
-                </MudItem>
-            }
-        </MudGrid>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
     }
 
     @* Performance Metrics Chart *@
     @if (_performanceData.Count > 0)
     {
-        <MudText Typo="Typo.h5" Class="mb-4 mt-6">Performance Metrics</MudText>
-        <MudPaper Elevation="1" Class="pa-4 mb-6">
-            <MudChart ChartType="ChartType.Line"
-                      ChartSeries="@_chartSeries"
-                      XAxisLabels="@_chartLabels"
-                      ChartOptions="@_chartOptions"
-                      Height="300px" />
-            <MudStack Row="true" Justify="Justify.Center" Class="mt-2">
-                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">Search Time (ms)</MudChip>
-                <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Filled">Index Time (ms)</MudChip>
-            </MudStack>
-        </MudPaper>
+        <div class="gh-section">
+            <div class="gh-section-header">
+                <h2 class="gh-section-title">
+                    <MudIcon Icon="@Icons.Material.Filled.Timeline" Size="Size.Small" />
+                    Performance Metrics
+                </h2>
+            </div>
+
+            <div class="gh-box">
+                <div class="gh-box-body">
+                    <MudChart ChartType="ChartType.Line"
+                              ChartSeries="@_chartSeries"
+                              XAxisLabels="@_chartLabels"
+                              ChartOptions="@_chartOptions"
+                              Height="280px" />
+                    <div style="display: flex; justify-content: center; gap: var(--space-3); margin-top: var(--space-3);">
+                        <span class="gh-label accent">Search Time (ms)</span>
+                        <span class="gh-label success">Index Time (ms)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     }
 
     @* Activity and Search History *@
-    <MudGrid Spacing="3" Class="mt-4">
+    <div class="gh-two-col">
         @* Recent Indexing Activity *@
-        <MudItem xs="12" md="6">
-            <MudText Typo="Typo.h5" Class="mb-4">Recent Indexing Activity</MudText>
-            <MudPaper Elevation="1" Class="pa-4" Style="max-height: 400px; overflow-y: auto;">
+        <div class="gh-section">
+            <div class="gh-section-header">
+                <h2 class="gh-section-title">
+                    <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" />
+                    Recent Activity
+                </h2>
+            </div>
+
+            <div class="gh-list">
                 @if (_activityLogs.Count == 0)
                 {
-                    <MudAlert Severity="Severity.Info" Dense="true">No indexing activity yet.</MudAlert>
+                    <div class="gh-empty-state" style="padding: var(--space-4);">
+                        <div class="text-muted">No indexing activity yet.</div>
+                    </div>
                 }
                 else
                 {
-                    <MudList T="ActivityLogDto" Dense="true">
-                        @foreach (var activity in _activityLogs)
-                        {
-                            <MudListItem T="ActivityLogDto" Icon="@Icons.Material.Filled.Storage">
-                                <div class="d-flex justify-space-between align-center" style="width: 100%;">
-                                    <div>
-                                        <MudText Typo="Typo.body2">@activity.Description</MudText>
-                                        <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
-                                            @activity.RelativeTime
-                                        </MudText>
-                                    </div>
-                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info">
-                                        @activity.FormattedDuration
-                                    </MudChip>
-                                </div>
-                            </MudListItem>
-                        }
-                    </MudList>
+                    @foreach (var activity in _activityLogs)
+                    {
+                        <div class="gh-list-item">
+                            <div class="gh-list-item-icon">
+                                <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" />
+                            </div>
+                            <div class="gh-list-item-content">
+                                <div style="font-weight: 500;">@activity.Description</div>
+                                <div class="gh-list-item-meta">@activity.RelativeTime</div>
+                            </div>
+                            <div class="gh-list-item-actions">
+                                <span class="gh-label">@activity.FormattedDuration</span>
+                            </div>
+                        </div>
+                    }
                 }
-            </MudPaper>
-        </MudItem>
+            </div>
+        </div>
 
         @* Search Query History *@
-        <MudItem xs="12" md="6">
-            <MudText Typo="Typo.h5" Class="mb-4">Search Query History</MudText>
-            <MudPaper Elevation="1" Class="pa-4" Style="max-height: 400px; overflow-y: auto;">
+        <div class="gh-section">
+            <div class="gh-section-header">
+                <h2 class="gh-section-title">
+                    <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Small" />
+                    Search History
+                </h2>
+            </div>
+
+            <div class="gh-list">
                 @if (_searchHistory.Count == 0)
                 {
-                    <MudAlert Severity="Severity.Info" Dense="true">No search queries yet.</MudAlert>
+                    <div class="gh-empty-state" style="padding: var(--space-4);">
+                        <div class="text-muted">No search queries yet.</div>
+                    </div>
                 }
                 else
                 {
-                    <MudList T="SearchHistoryDto" Dense="true">
-                        @foreach (var search in _searchHistory)
-                        {
-                            <MudListItem T="SearchHistoryDto" Icon="@Icons.Material.Filled.Search">
-                                <div class="d-flex justify-space-between align-center" style="width: 100%;">
-                                    <div style="flex: 1; min-width: 0;">
-                                        <MudText Typo="Typo.body2" Style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                            @search.TruncatedQuery
-                                        </MudText>
-                                        <MudStack Row="true" Spacing="1">
-                                            <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
-                                                @search.RelativeTime
-                                            </MudText>
-                                            <MudText Typo="Typo.caption">|</MudText>
-                                            <MudText Typo="Typo.caption" Color="@(search.ResultCount > 0 ? Color.Success : Color.Warning)">
-                                                @search.ResultCount results
-                                            </MudText>
-                                            @if (search.CacheHit)
-                                            {
-                                                <MudIcon Icon="@Icons.Material.Filled.Cached" Size="Size.Small" Color="Color.Info" Title="Cache Hit" />
-                                            }
-                                        </MudStack>
-                                    </div>
-                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info">
-                                        @search.FormattedDuration
-                                    </MudChip>
+                    @foreach (var search in _searchHistory)
+                    {
+                        <div class="gh-list-item">
+                            <div class="gh-list-item-icon">
+                                <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Small" />
+                            </div>
+                            <div class="gh-list-item-content">
+                                <div class="gh-list-item-title" style="color: var(--color-fg-default);">@search.TruncatedQuery</div>
+                                <div class="gh-list-item-meta">
+                                    @search.RelativeTime
+                                    <span style="margin: 0 4px;">·</span>
+                                    <span class="@(search.ResultCount > 0 ? "text-success" : "text-warning")">@search.ResultCount results</span>
+                                    @if (search.CacheHit)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Cached" Size="Size.Small" Style="margin-left: 4px; color: var(--color-accent-fg);" Title="Cache Hit" />
+                                    }
                                 </div>
-                            </MudListItem>
-                        }
-                    </MudList>
+                            </div>
+                            <div class="gh-list-item-actions">
+                                <span class="gh-label">@search.FormattedDuration</span>
+                            </div>
+                        </div>
+                    }
                 }
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+            </div>
+        </div>
+    </div>
 }
 else
 {
-    <MudAlert Severity="Severity.Info" Icon="@Icons.Material.Filled.Info" Class="mt-4">
-        <MudText>No index data available. Index a directory to get started.</MudText>
-    </MudAlert>
+    <div class="gh-alert info">
+        <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Style="margin-right: 8px;" />
+        No index data available. Index a directory to get started.
+    </div>
 }
 
 @code {

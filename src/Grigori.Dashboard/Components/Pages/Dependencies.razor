@@ -5,124 +5,95 @@
 
 <PageTitle>Dependencies - Grigori</PageTitle>
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">Dependencies</MudText>
+<div class="gh-page-header">
+    <div>
+        <h1 class="gh-page-title">Dependencies</h1>
+        <p class="gh-page-subtitle">System dependencies and their status</p>
+    </div>
     @if (Tracker.AllReady)
     {
-        <MudChip T="string" Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Variant="Variant.Outlined">
+        <span class="gh-label success">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" />
             All Ready
-        </MudChip>
+        </span>
     }
     else
     {
-        <MudChip T="string" Icon="@Icons.Material.Filled.Sync" Color="Color.Warning" Variant="Variant.Outlined">
+        <span class="gh-label warning">
+            <MudIcon Icon="@Icons.Material.Filled.Sync" Size="Size.Small" />
             Initializing...
-        </MudChip>
+        </span>
     }
-</MudStack>
+</div>
 
 @if (_dependencies.Count == 0)
 {
-    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+    <div class="gh-alert info">
+        <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Style="margin-right: 8px;" />
         No dependencies registered.
-    </MudAlert>
+    </div>
 }
 else
 {
-    <MudGrid Spacing="3">
+    <div class="gh-list">
         @foreach (var dep in _dependencies)
         {
-            <MudItem xs="12" md="6">
-                <MudCard Elevation="2">
-                    <MudCardHeader>
-                        <CardHeaderAvatar>
-                            @switch (dep.State)
-                            {
-                                case DependencyState.Ready:
-                                    <MudAvatar Color="Color.Success" Variant="Variant.Outlined">
-                                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" />
-                                    </MudAvatar>
-                                    break;
-                                case DependencyState.Failed:
-                                    <MudAvatar Color="Color.Error" Variant="Variant.Outlined">
-                                        <MudIcon Icon="@Icons.Material.Filled.Error" />
-                                    </MudAvatar>
-                                    break;
-                                case DependencyState.Downloading:
-                                case DependencyState.Loading:
-                                case DependencyState.Checking:
-                                    <MudAvatar Color="Color.Info" Variant="Variant.Outlined">
-                                        <MudProgressCircular Size="Size.Small" Indeterminate="@(dep.Progress == null)" Value="@(dep.Progress ?? 0)" />
-                                    </MudAvatar>
-                                    break;
-                                default:
-                                    <MudAvatar Color="Color.Default" Variant="Variant.Outlined">
-                                        <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" />
-                                    </MudAvatar>
-                                    break;
-                            }
-                        </CardHeaderAvatar>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">@dep.Name</MudText>
-                            <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
-                                @dep.Description
-                            </MudText>
-                        </CardHeaderContent>
-                        <CardHeaderActions>
-                            <MudChip T="string" Size="Size.Small" Color="@GetStateColor(dep.State)" Variant="Variant.Text">
-                                @GetStateText(dep.State)
-                            </MudChip>
-                        </CardHeaderActions>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        @if (dep.State is DependencyState.Downloading or DependencyState.Loading or DependencyState.Checking)
-                        {
+            <div class="gh-list-item" style="padding: var(--space-4);">
+                <div class="gh-list-item-icon" style="width: 40px; height: 40px;">
+                    @switch (dep.State)
+                    {
+                        case DependencyState.Ready:
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="color: var(--color-success-fg);" />
+                            break;
+                        case DependencyState.Failed:
+                            <MudIcon Icon="@Icons.Material.Filled.Error" Style="color: var(--color-danger-fg);" />
+                            break;
+                        case DependencyState.Downloading:
+                        case DependencyState.Loading:
+                        case DependencyState.Checking:
+                            <MudProgressCircular Size="Size.Small" Indeterminate="@(dep.Progress == null)" Value="@(dep.Progress ?? 0)" Style="color: var(--color-accent-fg);" />
+                            break;
+                        default:
+                            <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" Style="color: var(--color-fg-subtle);" />
+                            break;
+                    }
+                </div>
+                <div class="gh-list-item-content" style="flex: 1;">
+                    <div style="font-weight: 600; margin-bottom: 2px;">@dep.Name</div>
+                    <div class="gh-list-item-meta">@dep.Description</div>
+
+                    @if (dep.State is DependencyState.Downloading or DependencyState.Loading or DependencyState.Checking)
+                    {
+                        <div style="margin-top: var(--space-2);">
                             <MudProgressLinear Value="@(dep.Progress ?? 0)"
                                                Indeterminate="@(dep.Progress == null)"
                                                Color="Color.Primary"
-                                               Class="mb-3"
-                                               Rounded="true" />
-                        }
+                                               Rounded="true"
+                                               Style="height: 4px;" />
+                        </div>
+                    }
 
-                        @if (!string.IsNullOrEmpty(dep.Message))
-                        {
-                            <MudAlert Severity="@(dep.State == DependencyState.Failed ? Severity.Error : Severity.Info)"
-                                      Variant="Variant.Text"
-                                      Dense="true"
-                                      NoIcon="true"
-                                      Class="mb-2">
-                                @dep.Message
-                            </MudAlert>
-                        }
-
-                        <MudStack Row="true" Spacing="4">
-                            @if (dep.StartedAt.HasValue)
-                            {
-                                <MudStack Spacing="0">
-                                    <MudText Typo="Typo.overline">Started</MudText>
-                                    <MudText Typo="Typo.body2">@dep.StartedAt.Value.ToLocalTime().ToString("HH:mm:ss")</MudText>
-                                </MudStack>
-                            }
-                            @if (dep.Duration.HasValue)
-                            {
-                                <MudStack Spacing="0">
-                                    <MudText Typo="Typo.overline">Duration</MudText>
-                                    <MudText Typo="Typo.body2">@FormatDuration(dep.Duration.Value)</MudText>
-                                </MudStack>
-                            }
-                            @if (dep.State == DependencyState.Downloading && dep.Progress.HasValue)
-                            {
-                                <MudStack Spacing="0">
-                                    <MudText Typo="Typo.overline">Progress</MudText>
-                                    <MudText Typo="Typo.body2">@(dep.Progress.Value.ToString("F0"))%</MudText>
-                                </MudStack>
-                            }
-                        </MudStack>
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
+                    @if (!string.IsNullOrEmpty(dep.Message))
+                    {
+                        <div class="@(dep.State == DependencyState.Failed ? "text-danger" : "text-muted")" style="margin-top: var(--space-1); font-size: 12px;">
+                            @dep.Message
+                        </div>
+                    }
+                </div>
+                <div class="gh-list-item-actions" style="flex-direction: column; align-items: flex-end; gap: var(--space-1);">
+                    <span class="gh-label @GetStateLabelClass(dep.State)">@GetStateText(dep.State)</span>
+                    @if (dep.StartedAt.HasValue)
+                    {
+                        <span class="text-subtle" style="font-size: 11px;">Started @dep.StartedAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
+                    }
+                    @if (dep.Duration.HasValue)
+                    {
+                        <span class="text-subtle" style="font-size: 11px;">@FormatDuration(dep.Duration.Value)</span>
+                    }
+                </div>
+            </div>
         }
-    </MudGrid>
+    </div>
 }
 
 @code {
@@ -143,12 +114,12 @@ else
         });
     }
 
-    private static Color GetStateColor(DependencyState state) => state switch
+    private static string GetStateLabelClass(DependencyState state) => state switch
     {
-        DependencyState.Ready => Color.Success,
-        DependencyState.Failed => Color.Error,
-        DependencyState.Downloading or DependencyState.Loading or DependencyState.Checking => Color.Info,
-        _ => Color.Default
+        DependencyState.Ready => "success",
+        DependencyState.Failed => "danger",
+        DependencyState.Downloading or DependencyState.Loading or DependencyState.Checking => "accent",
+        _ => ""
     };
 
     private static string GetStateText(DependencyState state) => state switch

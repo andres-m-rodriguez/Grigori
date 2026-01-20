@@ -2,6 +2,7 @@
 @inject DashboardService DashboardService
 @inject IBrowserViewportService BrowserViewportService
 @inject IGitHubService GitHubService
+@inject NavigationManager Navigation
 @implements IAsyncDisposable
 @implements IBrowserViewportObserver
 @using Grigori.Contracts.Interfaces
@@ -11,84 +12,69 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<MudLayout>
-    <MudAppBar Elevation="0" Dense="true" Style="background: linear-gradient(90deg, var(--mud-palette-primary-darken) 0%, var(--mud-palette-dark) 100%); border-bottom: 1px solid var(--mud-palette-lines-default);">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="ToggleDrawer" />
-        <MudIcon Icon="@Icons.Material.Filled.Hub" Class="mr-2" Style="color: var(--mud-palette-primary);" />
-        <MudText Typo="Typo.h6" Style="font-weight: 600;">Grigori</MudText>
-        <MudSpacer />
-        <MudChip T="string" Icon="@Icons.Material.Filled.Storage" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">
-            @_totalChunks.ToString("N0") chunks
-        </MudChip>
-    </MudAppBar>
+<div class="gh-layout">
+    @* GitHub-style Header *@
+    <header class="gh-header">
+        <div class="gh-header-left">
+            <a href="" class="gh-logo">
+                <MudIcon Icon="@Icons.Material.Filled.Hub" Size="Size.Medium" />
+                <span>Grigori</span>
+            </a>
 
-    <MudDrawer @bind-Open="_drawerOpen"
-               Elevation="2"
-               Variant="@_drawerVariant"
-               OpenMiniOnHover="@(!_isMobile)"
-               ClipMode="DrawerClipMode.Always"
-               Breakpoint="Breakpoint.Md">
-
-        <MudNavMenu Color="Color.Primary">
-            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" IconColor="Color.Info">
-                Home
-            </MudNavLink>
-            <MudNavLink Href="dashboard" Icon="@Icons.Material.Filled.Dashboard" IconColor="Color.Secondary">
-                Dashboard
-            </MudNavLink>
-            <MudNavLink Href="search" Icon="@Icons.Material.Filled.Search" IconColor="Color.Tertiary">
-                Search
-            </MudNavLink>
-            <MudNavLink Href="projects" Icon="@Icons.Material.Filled.Folder" IconColor="Color.Warning">
-                Projects
-            </MudNavLink>
-            <MudNavLink Href="dependencies" Icon="@Icons.Material.Filled.Extension" IconColor="Color.Success">
-                Dependencies
-            </MudNavLink>
-            @if (GitHubService.IsAuthenticated)
-            {
-                <MudNavLink Href="github/projects" Icon="@Icons.Custom.Brands.GitHub" IconColor="Color.Default">
-                    GitHub Projects
-                </MudNavLink>
-            }
-            <MudNavGroup Title="Tools" Icon="@Icons.Material.Filled.Build" IconColor="Color.Error" Expanded="false">
-                <MudNavLink Href="tools/cli" Icon="@Icons.Material.Filled.Terminal">
-                    CLI
-                </MudNavLink>
-            </MudNavGroup>
-            <MudNavGroup Title="Integrations" Icon="@Icons.Material.Filled.Link" IconColor="Color.Info" Expanded="false">
-                <MudNavLink Href="integrations/github" Icon="@Icons.Custom.Brands.GitHub">
-                    GitHub
-                </MudNavLink>
-            </MudNavGroup>
-        </MudNavMenu>
-
-        <MudSpacer />
-
-        <div class="pa-3" style="background: var(--mud-palette-surface);">
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                <MudIcon Icon="@Icons.Material.Filled.Circle" Size="Size.Small" Color="Color.Success" />
-                @if (_drawerOpen || !_isMobile)
+            <nav class="gh-nav @(_mobileMenuOpen ? "mobile-open" : "")">
+                <a href="dashboard" class="gh-nav-link @(IsActive("dashboard") ? "active" : "")">
+                    <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Small" />
+                    <span>Dashboard</span>
+                </a>
+                <a href="search" class="gh-nav-link @(IsActive("search") ? "active" : "")">
+                    <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Small" />
+                    <span>Search</span>
+                </a>
+                <a href="projects" class="gh-nav-link @(IsActive("projects") ? "active" : "")">
+                    <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Small" />
+                    <span>Projects</span>
+                </a>
+                @if (GitHubService.IsAuthenticated)
                 {
-                    <MudText Typo="Typo.caption" Style="color: var(--mud-palette-success);">Online</MudText>
+                    <a href="github/projects" class="gh-nav-link @(IsActive("github") ? "active" : "")">
+                        <MudIcon Icon="@Icons.Custom.Brands.GitHub" Size="Size.Small" />
+                        <span>GitHub</span>
+                    </a>
                 }
-            </MudStack>
+            </nav>
         </div>
-    </MudDrawer>
 
-    <MudMainContent Class="pt-14">
-        <MudContainer MaxWidth="MaxWidth.Large" Class="py-4 px-4">
+        <div class="gh-header-right">
+            <div class="gh-stats-badge">
+                <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" />
+                <span>@_totalChunks.ToString("N0")</span>
+            </div>
+
+            <MudMenu Icon="@Icons.Material.Filled.MoreVert" Dense="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                <MudMenuItem Href="dependencies" Icon="@Icons.Material.Filled.Extension">Dependencies</MudMenuItem>
+                <MudMenuItem Href="tools/cli" Icon="@Icons.Material.Filled.Terminal">CLI</MudMenuItem>
+                <MudDivider />
+                <MudMenuItem Href="integrations/github" Icon="@Icons.Custom.Brands.GitHub">Settings</MudMenuItem>
+            </MudMenu>
+
+            <button class="gh-mobile-toggle" @onclick="ToggleMobileMenu">
+                <MudIcon Icon="@(_mobileMenuOpen ? Icons.Material.Filled.Close : Icons.Material.Filled.Menu)" />
+            </button>
+        </div>
+    </header>
+
+    @* Main Content *@
+    <main class="gh-main">
+        <div class="gh-container">
             @Body
-        </MudContainer>
-    </MudMainContent>
-</MudLayout>
+        </div>
+    </main>
+</div>
 
 @code {
-    private bool _drawerOpen = true;
+    private bool _mobileMenuOpen = false;
     private bool _isMobile = false;
     private int _totalChunks = 0;
-
-    private DrawerVariant _drawerVariant => _isMobile ? DrawerVariant.Temporary : DrawerVariant.Mini;
 
     // IBrowserViewportObserver implementation
     public Guid Id { get; } = Guid.NewGuid();
@@ -97,43 +83,49 @@
     {
         PaletteLight = new PaletteLight()
         {
-            Primary = "#7c4dff",
-            Secondary = "#00bfa5",
-            Tertiary = "#ff6d00",
-            Info = "#2196f3",
-            Success = "#00c853",
-            Warning = "#ffc107",
-            Error = "#ff5252",
+            Primary = "#2f81f7",
+            Secondary = "#238636",
+            Tertiary = "#a371f7",
+            Info = "#58a6ff",
+            Success = "#3fb950",
+            Warning = "#d29922",
+            Error = "#f85149",
         },
         PaletteDark = new PaletteDark()
         {
-            Primary = "#b388ff",
-            Secondary = "#64ffda",
-            Tertiary = "#ffab40",
-            Info = "#64b5f6",
-            Success = "#69f0ae",
-            Warning = "#ffd54f",
-            Error = "#ff8a80",
-            Surface = "#1e1e2e",
-            Background = "#121218",
-            BackgroundGray = "#1a1a24",
-            Dark = "#0d0d12",
-            DarkLighten = "#2a2a3a",
-            DrawerBackground = "#161622",
-            AppbarBackground = "#0d0d12",
-            TextPrimary = "#e4e4e7",
-            TextSecondary = "#a1a1aa",
+            Primary = "#2f81f7",
+            Secondary = "#238636",
+            Tertiary = "#a371f7",
+            Info = "#58a6ff",
+            Success = "#3fb950",
+            Warning = "#d29922",
+            Error = "#f85149",
+            Surface = "#161b22",
+            Background = "#0d1117",
+            BackgroundGray = "#161b22",
+            Dark = "#010409",
+            DarkLighten = "#21262d",
+            DrawerBackground = "#161b22",
+            AppbarBackground = "#010409",
+            TextPrimary = "#e6edf3",
+            TextSecondary = "#8b949e",
         },
         Typography = new Typography()
         {
             Default = new DefaultTypography()
             {
-                FontFamily = new[] { "Inter", "Segoe UI", "Roboto", "sans-serif" }
+                FontFamily = new[] { "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Noto Sans", "Helvetica", "Arial", "sans-serif" }
             }
         }
     };
 
-    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+    private bool IsActive(string path)
+    {
+        var uri = Navigation.ToBaseRelativePath(Navigation.Uri).ToLower();
+        return uri.StartsWith(path.ToLower());
+    }
+
+    private void ToggleMobileMenu() => _mobileMenuOpen = !_mobileMenuOpen;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -149,9 +141,9 @@
     public async Task NotifyBrowserViewportChangeAsync(BrowserViewportEventArgs args)
     {
         _isMobile = args.Breakpoint < Breakpoint.Md;
-        if (_isMobile && _drawerOpen)
+        if (!_isMobile && _mobileMenuOpen)
         {
-            _drawerOpen = false;
+            _mobileMenuOpen = false;
         }
         await InvokeAsync(StateHasChanged);
     }
