@@ -29,6 +29,17 @@ builder.AddNpgsqlDbContext<GrigoriDbContext>("grigori", configureDbContextOption
     options.UseNpgsql(npgsqlOptions => npgsqlOptions.UseVector());
 });
 
+// Add DbContextFactory for thread-safe concurrent operations (e.g., Task.WhenAll)
+builder.Services.AddDbContextFactory<GrigoriDbContext>(options =>
+{
+    // Connection string will be configured by Aspire at runtime
+    var connectionString = builder.Configuration.GetConnectionString("grigori");
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.UseVector());
+    }
+}, ServiceLifetime.Scoped);
+
 // Configure options
 builder.Services.Configure<GrigoriOptions>(builder.Configuration.GetSection(GrigoriOptions.SectionName));
 
