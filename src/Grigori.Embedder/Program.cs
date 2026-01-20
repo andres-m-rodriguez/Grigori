@@ -2,6 +2,9 @@ using Grigori.Embedder.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Add Aspire service defaults
+builder.AddServiceDefaults();
+
 // Add gRPC services
 builder.Services.AddGrpc();
 
@@ -15,6 +18,9 @@ _ = app.Services.GetRequiredService<OnnxEmbeddingGenerator>();
 
 // Map gRPC service
 app.MapGrpcService<EmbeddingGrpcService>();
+
+// Map Aspire default endpoints
+app.MapDefaultEndpoints();
 
 // Health check endpoint for Docker
 app.MapGet("/health", (OnnxEmbeddingGenerator generator) =>

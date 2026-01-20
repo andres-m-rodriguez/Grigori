@@ -26,9 +26,13 @@
 
     <!-- Trim settings - disabled due to ONNX Runtime reflection usage -->
     <PublishTrimmed>false</PublishTrimmed>
+
+    <!-- No static web assets needed for MCP server -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.0.1" />
     <PackageReference Include="ModelContextProtocol" Version="0.6.0-preview.1" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.6.0-preview.1" />
   </ItemGroup>
@@ -38,6 +42,7 @@
     <ProjectReference Include="..\Grigori.Database\Grigori.Database.csproj" />
     <ProjectReference Include="..\Grigori.DataAccess\Grigori.DataAccess.csproj" />
     <ProjectReference Include="..\Grigori.Infrastructure\Grigori.Infrastructure.csproj" />
+    <ProjectReference Include="..\Grigori.ServiceDefaults\Grigori.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>
