@@ -1,8 +1,10 @@
 @inherits LayoutComponentBase
 @inject DashboardService DashboardService
 @inject IBrowserViewportService BrowserViewportService
+@inject IGitHubService GitHubService
 @implements IAsyncDisposable
 @implements IBrowserViewportObserver
+@using Grigori.Contracts.Interfaces
 
 <MudThemeProvider Theme="_theme" IsDarkMode="true" />
 <MudPopoverProvider />
@@ -43,12 +45,18 @@
             <MudNavLink Href="dependencies" Icon="@Icons.Material.Filled.Extension" IconColor="Color.Success">
                 Dependencies
             </MudNavLink>
+            @if (GitHubService.IsAuthenticated)
+            {
+                <MudNavLink Href="github/projects" Icon="@Icons.Custom.Brands.GitHub" IconColor="Color.Default">
+                    GitHub Projects
+                </MudNavLink>
+            }
             <MudNavGroup Title="Tools" Icon="@Icons.Material.Filled.Build" IconColor="Color.Error" Expanded="false">
                 <MudNavLink Href="tools/cli" Icon="@Icons.Material.Filled.Terminal">
                     CLI
                 </MudNavLink>
             </MudNavGroup>
-            <MudNavGroup Title="Integrations" Icon="@Icons.Material.Filled.Extension" IconColor="Color.Info" Expanded="false">
+            <MudNavGroup Title="Integrations" Icon="@Icons.Material.Filled.Link" IconColor="Color.Info" Expanded="false">
                 <MudNavLink Href="integrations/github" Icon="@Icons.Custom.Brands.GitHub">
                     GitHub
                 </MudNavLink>
@@ -152,10 +160,18 @@
     {
         var stats = await DashboardService.GetIndexStatsAsync();
         _totalChunks = stats?.TotalChunks ?? 0;
+
+        GitHubService.AuthStateChanged += OnAuthStateChanged;
+    }
+
+    private async void OnAuthStateChanged()
+    {
+        await InvokeAsync(StateHasChanged);
     }
 
     public async ValueTask DisposeAsync()
     {
         await BrowserViewportService.UnsubscribeAsync(this);
+        GitHubService.AuthStateChanged -= OnAuthStateChanged;
     }
 }
