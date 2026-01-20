@@ -9,10 +9,14 @@ var postgres = builder.AddPostgres("postgres")
 
 var grigoriDb = postgres.AddDatabase("grigori");
 
-// Python Embedder service (container from pre-built image)
-// Build the embedder image separately: docker build -t grigori-embedder src/Grigori.Embedder
-var embedder = builder.AddContainer("embedder", "grigori-embedder", "latest")
-    .WithEndpoint(port: 50051, targetPort: 50051, name: "grpc", scheme: "http");
+// Embedder service (gRPC server for generating embeddings)
+var embedder = builder.AddProject("embedder", "../Grigori.Embedder/Grigori.Embedder.csproj")
+    .WithEndpoint("grpc", e =>
+    {
+        e.Port = 50051;
+        e.TargetPort = 50051;
+        e.IsProxied = false;
+    });
 
 // Grigori API (includes Dashboard)
 var api = builder.AddProject("api", "../Grigori.Api/Grigori.Api.csproj")

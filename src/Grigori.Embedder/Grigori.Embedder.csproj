@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Grigori.ServiceDefaults\Grigori.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Protobuf Include="Protos\embedding.proto" GrpcServices="Server" />
   </ItemGroup>
 
