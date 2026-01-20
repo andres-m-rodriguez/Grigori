@@ -24,7 +24,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Grigori.Contracts\Grigori.Contracts.csproj" />
-    <ProjectReference Include="..\Grigori.Database\Grigori.Database.csproj" />
   </ItemGroup>
 
 </Project>

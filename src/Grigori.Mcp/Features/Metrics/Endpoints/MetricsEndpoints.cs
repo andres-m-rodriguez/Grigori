@@ -42,7 +42,7 @@ public class MetricsEndpoints
                 cacheHitRate = snapshot.SearchStats.TotalSearches > 0
                     ? Math.Round((double)snapshot.SearchStats.CacheHits / (snapshot.SearchStats.CacheHits + snapshot.SearchStats.CacheMisses), 4)
                     : 0,
-                hnswSearches = snapshot.SearchStats.HnswSearches,
+                vectorSearches = snapshot.SearchStats.VectorSearches,
                 averageTimeMs = snapshot.SearchStats.AverageTimeMs,
                 averageResultCount = snapshot.SearchStats.AverageResultCount
             },

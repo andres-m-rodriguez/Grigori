@@ -31,7 +31,7 @@ public class IndexEndpoints
 
         _logger.LogInformation("Indexing directory: {Path}", path);
 
-        var request = new IndexRequestDto { Path = path };
+        var request = new IndexRequestDto(path);
         var result = await _indexService.IndexDirectoryAsync(request, cancellationToken);
 
         return result.Match(

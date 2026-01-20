@@ -3,7 +3,7 @@ using Grigori.Contracts.Dtos.Index;
 using Grigori.Contracts.Interfaces;
 using Grigori.Contracts.Options;
 using Grigori.Contracts.Results;
-using Grigori.Database;
+using Grigori.Contracts.Utilities;
 using Grigori.Infrastructure.Chunking;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.Logging;
@@ -112,14 +112,12 @@ public class IndexService : IIndexService
                 await _metricsService.RecordIndexingAsync(request.Path, stopwatch.ElapsedMilliseconds, totalFilesIndexed, totalChunksIndexed, cancellationToken);
             }
 
-            return new IndexResultDto
-            {
-                Success = true,
-                FilesIndexed = totalFilesIndexed,
-                ChunksCreated = totalChunksIndexed,
-                DurationMs = stopwatch.ElapsedMilliseconds,
-                Message = $"Indexed {totalFilesIndexed} files with {totalChunksIndexed} chunks from {request.Path}"
-            };
+            return new IndexResultDto(
+                true,
+                totalFilesIndexed,
+                totalChunksIndexed,
+                stopwatch.ElapsedMilliseconds,
+                $"Indexed {totalFilesIndexed} files with {totalChunksIndexed} chunks from {request.Path}");
         }
         catch (Exception ex)
         {
@@ -150,14 +148,12 @@ public class IndexService : IIndexService
             stopwatch.Stop();
             await _metricsService.RecordIndexingAsync(filePath, stopwatch.ElapsedMilliseconds, 1, chunkCount.Value, cancellationToken);
 
-            return new IndexResultDto
-            {
-                Success = true,
-                FilesIndexed = 1,
-                ChunksCreated = chunkCount.Value,
-                DurationMs = stopwatch.ElapsedMilliseconds,
-                Message = $"Indexed {chunkCount.Value} chunks from {filePath}"
-            };
+            return new IndexResultDto(
+                true,
+                1,
+                chunkCount.Value,
+                stopwatch.ElapsedMilliseconds,
+                $"Indexed {chunkCount.Value} chunks from {filePath}");
         }
         catch (Exception ex)
         {
@@ -183,7 +179,7 @@ public class IndexService : IIndexService
     private async Task<Result<int, GrigoriError>> IndexFileCoreAsync(string filePath, string storedPath, CancellationToken cancellationToken)
     {
         var content = await File.ReadAllTextAsync(filePath, cancellationToken);
-        var contentHash = GrigoriDbContext.ComputeHash(content);
+        var contentHash = ContentHasher.ComputeHash(content);
 
         if (await _chunkRepository.HasContentHashAsync(storedPath, contentHash, cancellationToken))
         {

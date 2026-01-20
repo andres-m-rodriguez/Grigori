@@ -1,3 +1,4 @@
+using Grigori.Contracts.Dtos.Dashboard;
 using Grigori.Mcp.Dashboard.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -15,12 +16,12 @@ public partial class Search : ComponentBase, IAsyncDisposable
     private string _searchMode = "hybrid";
     private string? _selectedFileType;
     private string? _selectedProject;
-    private List<SearchResult>? _results;
-    private List<SearchResult>? _filteredResults;
+    private List<SearchResultViewModel>? _results;
+    private List<SearchResultViewModel>? _filteredResults;
     private TimeSpan _searchDuration;
     private bool _isSearching;
     private CancellationTokenSource? _debounceTokenSource;
-    private List<IndexedProject> _projects = [];
+    private List<IndexedProjectDto> _projects = [];
     private HashSet<string> _availableFileTypes = [];
 
     // Debounce delay in milliseconds

@@ -124,27 +124,21 @@ public class SearchService : ISearchService
 
             var tokenEstimate = json.Length / 4;
 
-            return new SearchResultDto
-            {
-                Success = true,
-                Count = finalResults.Count,
-                Results = finalResults.Select(r => new CodeChunkDto
-                {
-                    FilePath = r.FilePath,
-                    StartLine = r.StartLine,
-                    EndLine = r.EndLine,
-                    Content = FormatContent(r.Content, request.OutputMode),
-                    Score = r.Score
-                }).ToList(),
-                Metrics = new SearchMetricsDto
-                {
-                    DurationMs = stopwatch.ElapsedMilliseconds,
-                    CacheHit = cacheHit,
-                    OutputMode = request.OutputMode,
-                    TokenEstimate = tokenEstimate,
-                    SearchMode = searchMode
-                }
-            };
+            return new SearchResultDto(
+                true,
+                finalResults.Count,
+                finalResults.Select(r => new CodeChunkDto(
+                    r.FilePath,
+                    r.StartLine,
+                    r.EndLine,
+                    FormatContent(r.Content, request.OutputMode),
+                    r.Score)).ToList(),
+                new SearchMetricsDto(
+                    stopwatch.ElapsedMilliseconds,
+                    cacheHit,
+                    request.OutputMode,
+                    tokenEstimate,
+                    searchMode));
         }
         catch (Exception ex)
         {

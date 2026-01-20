@@ -1,14 +1,7 @@
 namespace Grigori.Contracts.Dtos.Metrics;
 
-public record ActivityLogDto
+public record ActivityLogDto(long Id, string ActivityType, string Description, long DurationMs, DateTime Timestamp, string? Details = null)
 {
-    public required long Id { get; init; }
-    public required string ActivityType { get; init; }
-    public required string Description { get; init; }
-    public required long DurationMs { get; init; }
-    public required DateTime Timestamp { get; init; }
-    public string? Details { get; init; }
-
     public string FormattedDuration => DurationMs switch
     {
         < 1000 => $"{DurationMs}ms",
@@ -18,18 +11,11 @@ public record ActivityLogDto
 
     public string FormattedTimestamp => Timestamp.ToLocalTime().ToString("g");
 
-    public string RelativeTime
+    public string RelativeTime => (DateTime.UtcNow - Timestamp).TotalMinutes switch
     {
-        get
-        {
-            var elapsed = DateTime.UtcNow - Timestamp;
-            return elapsed.TotalMinutes switch
-            {
-                < 1 => "just now",
-                < 60 => $"{(int)elapsed.TotalMinutes}m ago",
-                < 1440 => $"{(int)elapsed.TotalHours}h ago",
-                _ => $"{(int)elapsed.TotalDays}d ago"
-            };
-        }
-    }
+        < 1 => "just now",
+        < 60 => $"{(int)(DateTime.UtcNow - Timestamp).TotalMinutes}m ago",
+        < 1440 => $"{(int)(DateTime.UtcNow - Timestamp).TotalHours}h ago",
+        _ => $"{(int)(DateTime.UtcNow - Timestamp).TotalDays}d ago"
+    };
 }

@@ -33,12 +33,7 @@ public class BenchmarkService
 
         // Run semantic search
         var semanticStopwatch = Stopwatch.StartNew();
-        var searchRequest = new SearchRequestDto
-        {
-            Query = query,
-            Limit = 10,
-            OutputMode = "full"
-        };
+        var searchRequest = new SearchRequestDto(query, 10, "full");
         var semanticResult = await _searchService.SearchAsync(searchRequest, cancellationToken);
         semanticStopwatch.Stop();
 

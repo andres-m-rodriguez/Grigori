@@ -75,12 +75,7 @@ public class HybridSearchTests
             .ReturnsAsync(Result<List<ChunkForLexicalSearch>, GrigoriError>.Success(new List<ChunkForLexicalSearch>()));
 
         // Act
-        var result = await _searchService.SearchAsync(new SearchRequestDto
-        {
-            Query = query,
-            Limit = 10,
-            SearchMode = "hybrid"
-        });
+        var result = await _searchService.SearchAsync(new SearchRequestDto(query, 10, "full", null, "hybrid"));
 
         // Assert
         Assert.True(result.IsSuccess);
@@ -119,12 +114,7 @@ public class HybridSearchTests
             .ReturnsAsync(Result<List<ChunkForLexicalSearch>, GrigoriError>.Success(lexicalChunks));
 
         // Act
-        var result = await _searchService.SearchAsync(new SearchRequestDto
-        {
-            Query = query,
-            Limit = 10,
-            SearchMode = "hybrid"
-        });
+        var result = await _searchService.SearchAsync(new SearchRequestDto(query, 10, "full", null, "hybrid"));
 
         // Assert
         Assert.True(result.IsSuccess);
@@ -154,12 +144,7 @@ public class HybridSearchTests
             .ReturnsAsync(Result<List<ChunkForLexicalSearch>, GrigoriError>.Success(new List<ChunkForLexicalSearch>()));
 
         // Act
-        var result = await _searchService.SearchAsync(new SearchRequestDto
-        {
-            Query = query,
-            Limit = 10,
-            SearchMode = "hybrid"
-        });
+        var result = await _searchService.SearchAsync(new SearchRequestDto(query, 10, "full", null, "hybrid"));
 
         // Assert
         Assert.True(result.IsSuccess);
@@ -200,12 +185,7 @@ public class HybridSearchTests
             .ReturnsAsync(Result<List<ChunkForLexicalSearch>, GrigoriError>.Success(lexicalChunks));
 
         // Act
-        var result = await _searchService.SearchAsync(new SearchRequestDto
-        {
-            Query = query,
-            Limit = 10,
-            SearchMode = "hybrid"
-        });
+        var result = await _searchService.SearchAsync(new SearchRequestDto(query, 10, "full", null, "hybrid"));
 
         // Assert
         Assert.True(result.IsSuccess);
@@ -243,12 +223,7 @@ public class HybridSearchTests
             .ReturnsAsync(Result<List<ChunkForLexicalSearch>, GrigoriError>.Success(lexicalChunks));
 
         // Act
-        var result = await _searchService.SearchAsync(new SearchRequestDto
-        {
-            Query = query,
-            Limit = 10,
-            SearchMode = "hybrid"
-        });
+        var result = await _searchService.SearchAsync(new SearchRequestDto(query, 10, "full", null, "hybrid"));
 
         // Assert
         Assert.True(result.IsSuccess);
@@ -282,12 +257,7 @@ public class HybridSearchTests
             .ReturnsAsync(GrigoriError.SearchFailed(query, "Lexical search failed"));
 
         // Act
-        var result = await _searchService.SearchAsync(new SearchRequestDto
-        {
-            Query = query,
-            Limit = 10,
-            SearchMode = "hybrid"
-        });
+        var result = await _searchService.SearchAsync(new SearchRequestDto(query, 10, "full", null, "hybrid"));
 
         // Assert
         Assert.True(result.IsSuccess);
