@@ -50,6 +50,7 @@ if (!mcpMode && !mcpHttpMode && !dashboardOnly)
 // Add configuration
 var projectDir = AppContext.BaseDirectory;
 builder.Configuration.AddJsonFile(Path.Combine(projectDir, "appsettings.json"), optional: true);
+builder.Configuration.AddEnvironmentVariables();
 
 // Configure options
 builder.Services.Configure<GrigoriOptions>(builder.Configuration.GetSection(GrigoriOptions.SectionName));

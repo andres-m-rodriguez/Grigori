@@ -53,9 +53,10 @@ RUN curl -L -o model.onnx \
 # -----------------------------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
-# Install native dependencies for ONNX Runtime
+# Install native dependencies for ONNX Runtime and health check
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security

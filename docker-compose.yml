@@ -69,7 +69,7 @@ services:
     ports:
       - "50051:50051"
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:50051/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:50051/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -97,7 +97,7 @@ services:
       embedder:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5151/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5151/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
