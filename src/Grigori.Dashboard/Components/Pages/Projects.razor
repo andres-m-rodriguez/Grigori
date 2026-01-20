@@ -4,77 +4,71 @@
 
 <PageTitle>Projects - Grigori</PageTitle>
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">Indexed Projects</MudText>
-    <MudChip T="string" Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Variant="Variant.Outlined">
-        @_projects.Count projects
-    </MudChip>
-</MudStack>
+<div class="gh-page-header">
+    <div>
+        <h1 class="gh-page-title">Projects</h1>
+        <p class="gh-page-subtitle">Indexed codebases in your local Grigori instance</p>
+    </div>
+    <span class="gh-counter" style="font-size: 14px; padding: 4px 12px;">@_projects.Count</span>
+</div>
 
 @if (_loading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <div class="gh-loading">
+        <MudProgressCircular Indeterminate="true" Size="Size.Medium" />
+    </div>
 }
 else if (_projects.Count == 0)
 {
-    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
-        <MudStack Spacing="2">
-            <MudText Typo="Typo.body1">No projects indexed yet.</MudText>
-            <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
-                Use the MCP tool <code>index_directory</code> or the REST API to index a codebase.
-            </MudText>
-        </MudStack>
-    </MudAlert>
+    <div class="gh-empty-state">
+        <div class="gh-empty-state-icon">
+            <MudIcon Icon="@Icons.Material.Filled.FolderOff" Style="font-size: inherit;" />
+        </div>
+        <div class="gh-empty-state-title">No projects indexed yet</div>
+        <div class="gh-empty-state-text">
+            Use the MCP tool <code>index_directory</code> or the REST API to index a codebase.
+        </div>
+    </div>
 }
 else
 {
-    <MudGrid Spacing="3">
+    <div class="gh-list">
+        <div class="gh-list-header">
+            <div style="flex: 1;">Name</div>
+            <div style="width: 100px; text-align: right;">Files</div>
+            <div style="width: 100px; text-align: right;">Chunks</div>
+            <div style="width: 200px; text-align: right;">Last Indexed</div>
+        </div>
         @foreach (var project in _projects)
         {
-            <MudItem xs="12" sm="6" md="4">
-                <MudCard Elevation="2" Style="height: 100%;">
-                    <MudCardHeader>
-                        <CardHeaderAvatar>
-                            <MudAvatar Color="Color.Warning" Variant="Variant.Outlined">
-                                <MudIcon Icon="@Icons.Material.Filled.Folder" />
-                            </MudAvatar>
-                        </CardHeaderAvatar>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">@project.Name</MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        <MudText Typo="Typo.caption" Class="mb-3" Style="word-break: break-all; color: var(--mud-palette-text-secondary);">
-                            @project.Path
-                        </MudText>
-
-                        <MudStack Row="true" Spacing="2" Class="mb-3">
-                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">
-                                <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Size="Size.Small" Class="mr-1" />
-                                @project.FileCount.ToString("N0") files
-                            </MudChip>
-                            <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Text">
-                                <MudIcon Icon="@Icons.Material.Filled.DataObject" Size="Size.Small" Class="mr-1" />
-                                @project.ChunkCount.ToString("N0") chunks
-                            </MudChip>
-                        </MudStack>
-
-                        <MudText Typo="Typo.caption" Class="mb-2" Style="font-family: monospace; color: var(--mud-palette-tertiary);">
-                            @project.ExtensionsSummary
-                        </MudText>
-                    </MudCardContent>
-                    <MudCardActions>
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Class="px-2 pb-2" Style="width: 100%;">
-                            <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Style="color: var(--mud-palette-text-secondary);" />
-                            <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
-                                @project.FormattedLastIndexed
-                            </MudText>
-                        </MudStack>
-                    </MudCardActions>
-                </MudCard>
-            </MudItem>
+            <div class="gh-list-item">
+                <div class="gh-list-item-icon">
+                    <MudIcon Icon="@Icons.Material.Filled.Folder" Style="color: var(--color-attention-fg);" />
+                </div>
+                <div class="gh-list-item-content" style="flex: 1;">
+                    <div class="gh-list-item-title">@project.Name</div>
+                    <div class="gh-list-item-meta">
+                        <span class="text-mono">@project.Path</span>
+                    </div>
+                    <div style="margin-top: 4px;">
+                        <span class="gh-label purple" style="font-size: 11px;">@project.ExtensionsSummary</span>
+                    </div>
+                </div>
+                <div style="width: 100px; text-align: right;">
+                    <span class="text-mono">@project.FileCount.ToString("N0")</span>
+                </div>
+                <div style="width: 100px; text-align: right;">
+                    <span class="text-mono text-accent">@project.ChunkCount.ToString("N0")</span>
+                </div>
+                <div style="width: 200px; text-align: right;">
+                    <span class="text-muted" style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
+                        <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+                        @project.FormattedLastIndexed
+                    </span>
+                </div>
+            </div>
         }
-    </MudGrid>
+    </div>
 }
 
 @code {

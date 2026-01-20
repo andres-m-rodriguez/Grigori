@@ -3,63 +3,51 @@
 
 <PageTitle>Grigori - Semantic Code Search</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Medium" Class="d-flex flex-column align-center justify-center" Style="min-height: 60vh;">
-    <MudIcon Icon="@Icons.Material.Filled.Hub" Style="font-size: 6rem;" Color="Color.Primary" Class="mb-4" />
+<div class="gh-hero">
+    <div class="gh-hero-icon">
+        <MudIcon Icon="@Icons.Material.Filled.Hub" Style="font-size: inherit;" />
+    </div>
 
-    <MudText Typo="Typo.h3" Class="mb-2" Align="Align.Center">Grigori</MudText>
-    <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mb-6" Align="Align.Center">
-        Semantic Code Search Engine
-    </MudText>
+    <h1 class="gh-hero-title">Grigori</h1>
+    <p class="gh-hero-subtitle">Semantic Code Search Engine</p>
 
-    <MudText Typo="Typo.body1" Align="Align.Center" Class="mb-6" Style="max-width: 500px; color: var(--mud-palette-text-secondary);">
+    <p class="gh-hero-text">
         Index your codebases and search semantically using natural language.
         Find code by meaning, not just keywords.
-    </MudText>
+    </p>
 
-    <MudStack Row="true" Spacing="3" Class="mb-8">
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   Size="Size.Large"
-                   StartIcon="@Icons.Material.Filled.Search"
-                   Href="search">
+    <div class="gh-hero-actions">
+        <a href="search" class="gh-btn gh-btn-primary" style="padding: 10px 24px; font-size: 16px;">
+            <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Small" />
             Start Searching
-        </MudButton>
-        <MudButton Variant="Variant.Outlined"
-                   Color="Color.Primary"
-                   Size="Size.Large"
-                   StartIcon="@Icons.Material.Filled.Dashboard"
-                   Href="dashboard">
+        </a>
+        <a href="dashboard" class="gh-btn" style="padding: 10px 24px; font-size: 16px;">
+            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Small" />
             View Dashboard
-        </MudButton>
-    </MudStack>
+        </a>
+    </div>
 
-    <MudGrid Spacing="4" Justify="Justify.Center">
-        <MudItem xs="12" sm="4">
-            <MudPaper Elevation="0" Class="pa-4 text-center" Style="background: transparent;">
-                <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
-                <MudText Typo="Typo.subtitle1">Semantic Search</MudText>
-                <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
-                    Search by intent, not exact matches
-                </MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="4">
-            <MudPaper Elevation="0" Class="pa-4 text-center" Style="background: transparent;">
-                <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
-                <MudText Typo="Typo.subtitle1">HNSW Indexing</MudText>
-                <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
-                    Fast approximate nearest neighbor search
-                </MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="4">
-            <MudPaper Elevation="0" Class="pa-4 text-center" Style="background: transparent;">
-                <MudIcon Icon="@Icons.Material.Filled.FolderCopy" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
-                <MudText Typo="Typo.subtitle1">Multi-Project</MudText>
-                <MudText Typo="Typo.body2" Style="color: var(--mud-palette-text-secondary);">
-                    Index and search across multiple codebases
-                </MudText>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-</MudContainer>
+    <div class="gh-feature-grid">
+        <div class="gh-feature-card">
+            <div class="gh-feature-icon">
+                <MudIcon Icon="@Icons.Material.Filled.Psychology" Style="font-size: inherit;" />
+            </div>
+            <div class="gh-feature-title">Semantic Search</div>
+            <div class="gh-feature-text">Search by intent, not exact matches</div>
+        </div>
+        <div class="gh-feature-card">
+            <div class="gh-feature-icon">
+                <MudIcon Icon="@Icons.Material.Filled.Speed" Style="font-size: inherit;" />
+            </div>
+            <div class="gh-feature-title">HNSW Indexing</div>
+            <div class="gh-feature-text">Fast approximate nearest neighbor search</div>
+        </div>
+        <div class="gh-feature-card">
+            <div class="gh-feature-icon">
+                <MudIcon Icon="@Icons.Material.Filled.FolderCopy" Style="font-size: inherit;" />
+            </div>
+            <div class="gh-feature-title">Multi-Project</div>
+            <div class="gh-feature-text">Index and search across multiple codebases</div>
+        </div>
+    </div>
+</div>
