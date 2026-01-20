@@ -20,16 +20,17 @@ COPY src/Grigori.Contracts/Grigori.Contracts.csproj src/Grigori.Contracts/
 COPY src/Grigori.Database/Grigori.Database.csproj src/Grigori.Database/
 COPY src/Grigori.DataAccess/Grigori.DataAccess.csproj src/Grigori.DataAccess/
 COPY src/Grigori.Infrastructure/Grigori.Infrastructure.csproj src/Grigori.Infrastructure/
-COPY src/Grigori.Mcp/Grigori.Mcp.csproj src/Grigori.Mcp/
+COPY src/Grigori.Dashboard/Grigori.Dashboard.csproj src/Grigori.Dashboard/
+COPY src/Grigori.Api/Grigori.Api.csproj src/Grigori.Api/
 
 # Restore dependencies
-RUN dotnet restore src/Grigori.Mcp/Grigori.Mcp.csproj
+RUN dotnet restore src/Grigori.Api/Grigori.Api.csproj
 
 # Copy source code
 COPY src/ src/
 
 # Build and publish
-RUN dotnet publish src/Grigori.Mcp/Grigori.Mcp.csproj \
+RUN dotnet publish src/Grigori.Api/Grigori.Api.csproj \
     -c Release \
     -o /app/publish \
     -p:SelfContained=false \
@@ -64,4 +65,4 @@ EXPOSE 5151
 
 USER grigori
 
-ENTRYPOINT ["dotnet", "/app/Grigori.Mcp.dll", "--server"]
+ENTRYPOINT ["dotnet", "/app/Grigori.Api.dll"]

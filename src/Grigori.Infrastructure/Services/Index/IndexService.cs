@@ -9,7 +9,7 @@ using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Grigori.Mcp.Features.Index.Services;
+namespace Grigori.Infrastructure.Services.Index;
 
 public class IndexService : IIndexService
 {

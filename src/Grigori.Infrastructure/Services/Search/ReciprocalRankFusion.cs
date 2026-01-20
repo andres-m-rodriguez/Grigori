@@ -1,4 +1,4 @@
-namespace Grigori.Mcp.Features.Search.Services;
+namespace Grigori.Infrastructure.Services.Search;
 
 /// <summary>
 /// Reciprocal Rank Fusion (RRF) for combining multiple ranked lists.

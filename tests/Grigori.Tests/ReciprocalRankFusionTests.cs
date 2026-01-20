@@ -1,4 +1,4 @@
-using Grigori.Mcp.Features.Search.Services;
+using Grigori.Infrastructure.Services.Search;
 
 namespace Grigori.Tests;
 

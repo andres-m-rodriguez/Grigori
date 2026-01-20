@@ -9,7 +9,7 @@ using Grigori.Infrastructure.Chunking;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Grigori.Mcp.Features.Search.Services;
+namespace Grigori.Infrastructure.Services.Search;
 
 public class SearchService : ISearchService
 {
