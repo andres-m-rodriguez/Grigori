@@ -1,0 +1,142 @@
+@page "/github/projects"
+@using Grigori.Contracts.Dtos.GitHub
+
+<PageTitle>GitHub Projects - Grigori</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">GitHub Projects</MudText>
+    @if (GitHubService.IsAuthenticated && _user != null)
+    {
+        <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">
+            @_user.Login
+        </MudChip>
+    }
+</MudStack>
+
+<GitHubAuthRequired FeatureDescription="Connect your GitHub account to view your repositories and track activity.">
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <MudPaper Elevation="1" Class="pa-4 mb-4">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_searchQuery"
+                                  Placeholder="Search repositories..."
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true"
+                                  DebounceInterval="300"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudSelect T="string" @bind-Value="_languageFilter"
+                               Label="Language"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Clearable="true">
+                        @foreach (var lang in Languages)
+                        {
+                            <MudSelectItem Value="@lang">@lang</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudSelect T="string" @bind-Value="_visibilityFilter"
+                               Label="Visibility"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense">
+                        <MudSelectItem Value="@("all")">All</MudSelectItem>
+                        <MudSelectItem Value="@("public")">Public</MudSelectItem>
+                        <MudSelectItem Value="@("private")">Private</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @if (FilteredRepositories.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">
+                No repositories found matching your criteria.
+            </MudAlert>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                Showing @PaginatedRepositories.Count of @FilteredRepositories.Count repositories
+            </MudText>
+
+            <MudGrid Spacing="3">
+                @foreach (var repo in PaginatedRepositories)
+                {
+                    <MudItem xs="12" sm="6" lg="4">
+                        <MudCard Elevation="1" Class="cursor-pointer" @onclick="() => NavigateToProject(repo)">
+                            <MudCardHeader>
+                                <CardHeaderAvatar>
+                                    <MudIcon Icon="@(repo.IsPrivate ? Icons.Material.Filled.Lock : Icons.Material.Filled.Public)"
+                                             Color="@(repo.IsPrivate ? Color.Warning : Color.Info)" />
+                                </CardHeaderAvatar>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.subtitle1">@repo.Name</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@repo.FullName</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                                   Size="Size.Small"
+                                                   Href="@repo.HtmlUrl"
+                                                   Target="_blank" />
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                @if (!string.IsNullOrEmpty(repo.Description))
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                                        @TruncateDescription(repo.Description)
+                                    </MudText>
+                                }
+                                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                                    @if (!string.IsNullOrEmpty(repo.Language))
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
+                                            @repo.Language
+                                        </MudChip>
+                                    }
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.Star">
+                                        @repo.StarCount
+                                    </MudChip>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Filled.CallSplit">
+                                        @repo.ForkCount
+                                    </MudChip>
+                                </MudStack>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Updated @FormatDate(repo.PushedAt ?? repo.UpdatedAt)
+                                </MudText>
+                                <MudSpacer />
+                                <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Text"
+                                           OnClick="() => NavigateToProject(repo)">
+                                    View Details
+                                </MudButton>
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+
+            @if (FilteredRepositories.Count > PageSize)
+            {
+                <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
+                    <MudPagination Count="@TotalPages"
+                                   Selected="_currentPage"
+                                   SelectedChanged="OnPageChanged"
+                                   Color="Color.Primary"
+                                   Variant="Variant.Filled" />
+                </MudStack>
+            }
+        }
+    }
+</GitHubAuthRequired>

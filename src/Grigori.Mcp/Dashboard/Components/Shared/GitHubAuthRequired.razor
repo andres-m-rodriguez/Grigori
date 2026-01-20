@@ -1,0 +1,34 @@
+@using Grigori.Contracts.Interfaces
+@inject IGitHubService GitHubService
+
+@if (!GitHubService.IsAuthenticated)
+{
+    <MudPaper Elevation="0" Class="pa-8">
+        <MudStack AlignItems="AlignItems.Center" Spacing="4">
+            <MudIcon Icon="@Icons.Custom.Brands.GitHub" Size="Size.Large" Color="Color.Default" />
+            <MudText Typo="Typo.h5">GitHub Connection Required</MudText>
+            <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary">
+                @FeatureDescription
+            </MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Link"
+                       Href="/integrations/github"
+                       Class="mt-2">
+                Connect GitHub
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter]
+    public string FeatureDescription { get; set; } = "Connect your GitHub account to access this feature.";
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}
