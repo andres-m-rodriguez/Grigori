@@ -1,8 +1,10 @@
 @inherits LayoutComponentBase
 @inject DashboardService DashboardService
 @inject IBrowserViewportService BrowserViewportService
+@inject IGitHubService GitHubService
 @implements IAsyncDisposable
 @implements IBrowserViewportObserver
+@using Grigori.Contracts.Interfaces
 
 <MudThemeProvider Theme="_theme" IsDarkMode="true" />
 <MudPopoverProvider />
@@ -43,6 +45,20 @@
             <MudNavLink Href="dependencies" Icon="@Icons.Material.Filled.Extension" IconColor="Color.Success">
                 Dependencies
             </MudNavLink>
+            @if (GitHubService.IsAuthenticated)
+            {
+                <MudNavGroup Title="Activity" Icon="@Icons.Material.Filled.Timeline" IconColor="Color.Primary" Expanded="false">
+                    <MudNavLink Href="activity/feed" Icon="@Icons.Material.Filled.RssFeed">
+                        Activity Feed
+                    </MudNavLink>
+                    <MudNavLink Href="activity/hotspots" Icon="@Icons.Material.Filled.Whatshot">
+                        Hot Spots
+                    </MudNavLink>
+                    <MudNavLink Href="activity/pulse" Icon="@Icons.Material.Filled.MonitorHeart">
+                        Project Pulse
+                    </MudNavLink>
+                </MudNavGroup>
+            }
             <MudNavGroup Title="Tools" Icon="@Icons.Material.Filled.Build" IconColor="Color.Error" Expanded="false">
                 <MudNavLink Href="tools/cli" Icon="@Icons.Material.Filled.Terminal">
                     CLI
@@ -152,10 +168,19 @@
     {
         var stats = await DashboardService.GetIndexStatsAsync();
         _totalChunks = stats?.TotalChunks ?? 0;
+
+        // Subscribe to GitHub auth state changes to update nav menu
+        GitHubService.AuthStateChanged += OnAuthStateChanged;
+    }
+
+    private async void OnAuthStateChanged()
+    {
+        await InvokeAsync(StateHasChanged);
     }
 
     public async ValueTask DisposeAsync()
     {
         await BrowserViewportService.UnsubscribeAsync(this);
+        GitHubService.AuthStateChanged -= OnAuthStateChanged;
     }
 }

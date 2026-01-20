@@ -1,0 +1,29 @@
+@page "/activity/feed"
+
+<PageTitle>Activity Feed - Grigori</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Activity Feed</MudText>
+
+<GitHubAuthRequired FeatureDescription="Connect your GitHub account to view recent commits, pull requests, and branch activity across your repositories.">
+    <MudAlert Severity="Severity.Info" Class="mb-4">
+        Activity Feed feature coming soon. This page will display recent commits, PRs, and branch activity.
+    </MudAlert>
+
+    <MudPaper Elevation="1" Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-3">Coming Soon</MudText>
+        <MudList T="string" Dense="true">
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Commit">
+                Recent commits across all repositories
+            </MudListItem>
+            <MudListItem T="string" Icon="@Icons.Material.Filled.MergeType">
+                Pull request activity and status
+            </MudListItem>
+            <MudListItem T="string" Icon="@Icons.Material.Filled.AccountTree">
+                Branch creation and deletion events
+            </MudListItem>
+            <MudListItem T="string" Icon="@Icons.Material.Filled.FilterList">
+                Filter by repository, author, or date range
+            </MudListItem>
+        </MudList>
+    </MudPaper>
+</GitHubAuthRequired>
