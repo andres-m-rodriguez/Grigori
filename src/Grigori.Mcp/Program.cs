@@ -35,6 +35,9 @@ var mcpHttpMode = args.Contains("--mcp-http");  // HTTP MCP mode (for remote AI 
 if (!mcpMode)
     mcpHttpMode = true;
 
+// Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
 // Add configuration
 var projectDir = AppContext.BaseDirectory;
 builder.Configuration.AddJsonFile(Path.Combine(projectDir, "appsettings.json"), optional: true);
@@ -93,7 +96,10 @@ if (mcpHttpMode)
     app.MapMcp("/mcp");
 }
 
-// Health endpoint for container orchestration
+// Map Aspire default endpoints (health, alive)
+app.MapDefaultEndpoints();
+
+// Legacy health endpoint for container orchestration
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
 // ============================================================================

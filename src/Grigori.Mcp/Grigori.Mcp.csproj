@@ -38,6 +38,7 @@
     <ProjectReference Include="..\Grigori.Database\Grigori.Database.csproj" />
     <ProjectReference Include="..\Grigori.DataAccess\Grigori.DataAccess.csproj" />
     <ProjectReference Include="..\Grigori.Infrastructure\Grigori.Infrastructure.csproj" />
+    <ProjectReference Include="..\Grigori.ServiceDefaults\Grigori.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

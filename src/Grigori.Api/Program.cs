@@ -28,6 +28,9 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     WebRootPath = Path.Combine(appDir, "wwwroot")
 });
 
+// Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
 // Add configuration
 var projectDir = AppContext.BaseDirectory;
 builder.Configuration.AddJsonFile(Path.Combine(projectDir, "appsettings.json"), optional: true);
@@ -79,6 +82,9 @@ app.UseCors();
 // ============================================================================
 // REST API Endpoints
 // ============================================================================
+
+// Map Aspire default endpoints (health, alive)
+app.MapDefaultEndpoints();
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
     .WithTags("Health");

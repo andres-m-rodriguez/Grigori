@@ -9,6 +9,8 @@
     <Project Path="src/Grigori.Api/Grigori.Api.csproj" />
     <Project Path="src/Grigori.Cli/Grigori.Cli.csproj" />
     <Project Path="src/Grigori.Embedder/Grigori.Embedder.csproj" />
+    <Project Path="src/Grigori.ServiceDefaults/Grigori.ServiceDefaults.csproj" />
+    <Project Path="src/Grigori.AppHost/Grigori.AppHost.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Grigori.Tests/Grigori.Tests.csproj" />
