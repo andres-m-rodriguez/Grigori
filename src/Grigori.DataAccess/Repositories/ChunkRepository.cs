@@ -11,14 +11,14 @@ namespace Grigori.DataAccess.Repositories;
 
 public class ChunkRepository : IChunkRepository
 {
-    private readonly GrigoriDbContext _dbContext;
+    private readonly IDbContextFactory<GrigoriDbContext> _dbContextFactory;
     private readonly ILogger<ChunkRepository> _logger;
 
     public ChunkRepository(
-        GrigoriDbContext dbContext,
+        IDbContextFactory<GrigoriDbContext> dbContextFactory,
         ILogger<ChunkRepository> logger)
     {
-        _dbContext = dbContext;
+        _dbContextFactory = dbContextFactory;
         _logger = logger;
     }
 
@@ -29,6 +29,8 @@ public class ChunkRepository : IChunkRepository
     {
         try
         {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
             var entity = new ChunkEntity
             {
                 FilePath = input.FilePath,
@@ -41,8 +43,8 @@ public class ChunkRepository : IChunkRepository
                 IndexedAt = DateTime.UtcNow
             };
 
-            _dbContext.Chunks.Add(entity);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.Chunks.Add(entity);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             return entity.Id;
         }
@@ -68,6 +70,8 @@ public class ChunkRepository : IChunkRepository
 
         try
         {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
             var entities = inputs.Zip(embeddings, (input, embedding) => new ChunkEntity
             {
                 FilePath = input.FilePath,
@@ -80,8 +84,8 @@ public class ChunkRepository : IChunkRepository
                 IndexedAt = DateTime.UtcNow
             }).ToList();
 
-            await _dbContext.Chunks.AddRangeAsync(entities, cancellationToken);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.Chunks.AddRangeAsync(entities, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             return entities.Count;
         }
@@ -102,10 +106,12 @@ public class ChunkRepository : IChunkRepository
     {
         try
         {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
             var queryVector = new Vector(queryEmbedding);
 
             // Start with base query
-            var query = _dbContext.Chunks.AsQueryable();
+            var query = dbContext.Chunks.AsQueryable();
 
             // Apply file extension filter
             if (fileExtensions is { Count: > 0 })
@@ -165,7 +171,9 @@ public class ChunkRepository : IChunkRepository
     {
         try
         {
-            var deleted = await _dbContext.Chunks
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var deleted = await dbContext.Chunks
                 .Where(c => c.FilePath == filePath)
                 .ExecuteDeleteAsync(cancellationToken);
 
@@ -183,7 +191,9 @@ public class ChunkRepository : IChunkRepository
         string hash,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Chunks
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await dbContext.Chunks
             .AnyAsync(c => c.FilePath == filePath && c.ContentHash == hash, cancellationToken);
     }
 
@@ -198,7 +208,9 @@ public class ChunkRepository : IChunkRepository
 
         try
         {
-            var chunks = await _dbContext.Chunks
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var chunks = await dbContext.Chunks
                 .Where(c => ids.Contains(c.Id))
                 .ToListAsync(cancellationToken);
 
@@ -225,7 +237,9 @@ public class ChunkRepository : IChunkRepository
     public async Task<IEnumerable<(long Id, float[] Embedding)>> GetAllEmbeddingsAsync(
         CancellationToken cancellationToken = default)
     {
-        var chunks = await _dbContext.Chunks
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var chunks = await dbContext.Chunks
             .Select(c => new { c.Id, c.Embedding })
             .ToListAsync(cancellationToken);
 
@@ -238,7 +252,9 @@ public class ChunkRepository : IChunkRepository
     {
         try
         {
-            var query = _dbContext.Chunks.AsQueryable();
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var query = dbContext.Chunks.AsQueryable();
 
             if (fileExtensions is { Count: > 0 })
             {

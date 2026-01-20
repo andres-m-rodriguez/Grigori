@@ -9,12 +9,12 @@ namespace Grigori.DataAccess.Repositories;
 
 public class DashboardRepository : IDashboardRepository
 {
-    private readonly GrigoriDbContext _dbContext;
+    private readonly IDbContextFactory<GrigoriDbContext> _dbContextFactory;
     private readonly ILogger<DashboardRepository> _logger;
 
-    public DashboardRepository(GrigoriDbContext dbContext, ILogger<DashboardRepository> logger)
+    public DashboardRepository(IDbContextFactory<GrigoriDbContext> dbContextFactory, ILogger<DashboardRepository> logger)
     {
-        _dbContext = dbContext;
+        _dbContextFactory = dbContextFactory;
         _logger = logger;
     }
 
@@ -22,13 +22,15 @@ public class DashboardRepository : IDashboardRepository
     {
         try
         {
-            var totalChunks = await _dbContext.Chunks.CountAsync(cancellationToken);
-            var uniqueFiles = await _dbContext.Chunks.Select(c => c.FilePath).Distinct().CountAsync(cancellationToken);
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var totalChunks = await dbContext.Chunks.CountAsync(cancellationToken);
+            var uniqueFiles = await dbContext.Chunks.Select(c => c.FilePath).Distinct().CountAsync(cancellationToken);
             var totalSize = totalChunks > 0
-                ? await _dbContext.Chunks.SumAsync(c => (long)c.Content.Length, cancellationToken)
+                ? await dbContext.Chunks.SumAsync(c => (long)c.Content.Length, cancellationToken)
                 : 0;
             var lastUpdated = totalChunks > 0
-                ? await _dbContext.Chunks.MaxAsync(c => c.IndexedAt, cancellationToken)
+                ? await dbContext.Chunks.MaxAsync(c => c.IndexedAt, cancellationToken)
                 : (DateTime?)null;
 
             return new IndexStatsDto(totalChunks, uniqueFiles, totalSize, true, totalChunks, lastUpdated);
@@ -44,7 +46,9 @@ public class DashboardRepository : IDashboardRepository
     {
         try
         {
-            var chunks = await _dbContext.Chunks
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var chunks = await dbContext.Chunks
                 .Select(c => new { c.FilePath, c.IndexedAt })
                 .ToListAsync(cancellationToken);
 
