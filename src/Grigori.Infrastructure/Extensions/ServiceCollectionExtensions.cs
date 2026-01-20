@@ -4,6 +4,7 @@ using Grigori.Infrastructure.Chunking;
 using Grigori.Infrastructure.Dependencies;
 using Grigori.Infrastructure.Embeddings;
 using Grigori.Infrastructure.FileWatching;
+using Grigori.Infrastructure.GitHub;
 using Grigori.Infrastructure.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,6 +26,10 @@ public static class ServiceCollectionExtensions
 
         // File watching
         services.AddSingleton<FileWatcher>();
+
+        // GitHub integration (singleton for token state management)
+        services.AddHttpClient("GitHub");
+        services.AddSingleton<IGitHubService, GitHubService>();
 
         // Note: HNSW index removed - using pgvector for vector similarity search
 
