@@ -3,7 +3,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 // PostgreSQL with pgvector extension
 var postgres = builder.AddPostgres("postgres")
     .WithImage("pgvector/pgvector")
-    .WithImageTag("pg17")
+    .WithImageTag("pg16")
     .WithDataVolume("grigori-postgres-data")
     .WithPgAdmin();
 
