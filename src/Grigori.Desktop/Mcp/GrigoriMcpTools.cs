@@ -603,4 +603,380 @@ public sealed class GrigoriMcpTools(
         var success = await namingConventionRepository.DeleteAsync(id);
         return success ? $"Convention {id} deleted" : $"Convention with id {id} not found";
     }
+
+    // ===== SMART CONTEXT TOOLS =====
+
+    /// <summary>
+    /// Analyzes coding context for a specific task and returns only relevant information.
+    /// This reduces context window usage by filtering to what's needed.
+    /// </summary>
+    public async Task<string> AnalyzeForTask(string task)
+    {
+        var taskLower = task.ToLowerInvariant();
+        var taskWords = task.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        // Try to extract entity name (capitalized word)
+        var entityName = taskWords.FirstOrDefault(w => w.Length > 0 && char.IsUpper(w[0])) ?? "";
+
+        var patterns = new List<TaskPatternMatch>();
+        var avoid = new List<TaskAvoidanceMatch>();
+        var preferences = new List<TaskPreferenceMatch>();
+        TaskNamingMatch? naming = null;
+        TaskLayerMatch? layer = null;
+        TaskTemplateMatch? template = null;
+
+        // Find relevant coding patterns
+        await foreach (var p in codingPatternRepository.GetAsync(new CodingPatternParameters(PageSize: 100)))
+        {
+            if (!p.IsActive) continue;
+
+            if (taskLower.Contains(p.Category.ToLowerInvariant()) ||
+                taskLower.Contains(p.Name.ToLowerInvariant()) ||
+                p.Name.ToLowerInvariant().Split(' ').Any(w => taskLower.Contains(w)))
+            {
+                patterns.Add(new TaskPatternMatch(p.Name, p.Description, p.Example));
+            }
+        }
+
+        // Find relevant avoidance rules (prioritize high severity)
+        await foreach (var a in avoidanceRuleRepository.GetAsync(new AvoidanceRuleParameters(PageSize: 100)))
+        {
+            if (taskLower.Contains(a.Category.ToLowerInvariant()) ||
+                taskLower.Contains(a.Name.ToLowerInvariant()) ||
+                a.Severity == AvoidanceSeverity.Never) // Always include "Never" rules
+            {
+                avoid.Add(new TaskAvoidanceMatch(a.Name, a.Description, a.Severity.ToString()));
+            }
+        }
+
+        // Find relevant design preferences
+        await foreach (var p in designPreferenceRepository.GetAsync(new DesignPreferenceParameters(PageSize: 100)))
+        {
+            if (taskLower.Contains(p.Category.ToLowerInvariant()))
+            {
+                preferences.Add(new TaskPreferenceMatch(p.Preference, p.Rationale, p.Priority));
+            }
+        }
+
+        // Find matching naming convention
+        await foreach (var n in namingConventionRepository.GetAsync(new NamingConventionParameters(PageSize: 100)))
+        {
+            if (taskLower.Contains(n.Context.ToLowerInvariant()))
+            {
+                var suggested = string.IsNullOrEmpty(entityName)
+                    ? n.Example
+                    : n.Pattern.Replace("{{Entity}}", entityName);
+                naming = new TaskNamingMatch(n.Context, n.Pattern, suggested, n.Example);
+                break;
+            }
+        }
+
+        // Find matching code template
+        await foreach (var t in codeTemplateRepository.GetAsync(new CodeTemplateParameters(PageSize: 100)))
+        {
+            if (taskLower.Contains(t.Category.ToLowerInvariant()) ||
+                taskLower.Contains(t.Name.ToLowerInvariant()))
+            {
+                template = new TaskTemplateMatch(t.Id, t.Name, t.Description, t.Language, t.Category);
+                break;
+            }
+        }
+
+        // Find target layer from active architecture
+        var activePattern = await architecturePatternRepository.GetActiveAsync();
+        if (activePattern != null)
+        {
+            foreach (var l in activePattern.Layers.OrderBy(static x => x.Order))
+            {
+                var layerName = l.Name.ToLowerInvariant();
+                var layerDesc = l.Description.ToLowerInvariant();
+                var layerResp = l.Responsibility.ToLowerInvariant();
+
+                if (taskWords.Any(w => layerName.Contains(w.ToLowerInvariant())) ||
+                    taskWords.Any(w => layerDesc.Contains(w.ToLowerInvariant())) ||
+                    taskWords.Any(w => layerResp.Contains(w.ToLowerInvariant())))
+                {
+                    layer = new TaskLayerMatch(l.Name, l.Responsibility, l.Description);
+                    break;
+                }
+            }
+        }
+
+        var topPreferences = preferences
+            .OrderByDescending(static p => p.Priority)
+            .Take(5)
+            .ToList();
+
+        var response = new TaskAnalysisResponse(
+            task,
+            entityName,
+            patterns,
+            naming,
+            layer,
+            avoid,
+            template,
+            topPreferences);
+
+        return JsonSerializer.Serialize(response, JsonOptions);
+    }
+
+    /// <summary>
+    /// Validates a name against naming conventions.
+    /// </summary>
+    public async Task<string> ValidateNaming(string name, string context)
+    {
+        await foreach (var conv in namingConventionRepository.GetAsync(new NamingConventionParameters(PageSize: 100)))
+        {
+            if (conv.Context.Equals(context, StringComparison.OrdinalIgnoreCase))
+            {
+                // Extract entity from name using the pattern
+                // Pattern like "{{Entity}}Repository" means name should end with "Repository"
+                var pattern = conv.Pattern;
+                var prefix = "";
+                var suffix = "";
+
+                var placeholderIndex = pattern.IndexOf("{{Entity}}", StringComparison.OrdinalIgnoreCase);
+                if (placeholderIndex >= 0)
+                {
+                    prefix = pattern[..placeholderIndex];
+                    suffix = pattern[(placeholderIndex + "{{Entity}}".Length)..];
+                }
+
+                var matchesPrefix = string.IsNullOrEmpty(prefix) || name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+                var matchesSuffix = string.IsNullOrEmpty(suffix) || name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase);
+                var isValid = matchesPrefix && matchesSuffix;
+
+                // Extract what the entity name should be
+                var entityName = name;
+                if (!string.IsNullOrEmpty(prefix) && name.StartsWith(prefix))
+                    entityName = entityName[prefix.Length..];
+                if (!string.IsNullOrEmpty(suffix) && entityName.EndsWith(suffix))
+                    entityName = entityName[..^suffix.Length];
+
+                var expectedName = pattern.Replace("{{Entity}}", entityName);
+
+                var issues = new List<string>();
+                if (!matchesPrefix) issues.Add($"Should start with '{prefix}'");
+                if (!matchesSuffix) issues.Add($"Should end with '{suffix}'");
+
+                var response = new NamingValidationResponse(
+                    isValid,
+                    name,
+                    context,
+                    conv.Pattern,
+                    expectedName,
+                    conv.Example,
+                    null,
+                    issues);
+
+                return JsonSerializer.Serialize(response, JsonOptions);
+            }
+        }
+
+        var notFoundResponse = new NamingValidationResponse(
+            null,
+            name,
+            context,
+            null,
+            null,
+            null,
+            $"No naming convention found for context '{context}'",
+            []);
+
+        return JsonSerializer.Serialize(notFoundResponse, JsonOptions);
+    }
+
+    /// <summary>
+    /// Suggests a file path based on architecture layers and naming conventions.
+    /// </summary>
+    public async Task<string> SuggestFilePath(string name, string componentType)
+    {
+        var activePattern = await architecturePatternRepository.GetActiveAsync();
+        if (activePattern is null)
+        {
+            var noPatternResponse = new FilePathSuggestionResponse(
+                name,
+                componentType,
+                null,
+                null,
+                [],
+                "No active architecture pattern. Cannot suggest file path.");
+
+            return JsonSerializer.Serialize(noPatternResponse, JsonOptions);
+        }
+
+        var typeLower = componentType.ToLowerInvariant();
+        ArchitectureLayerForList? targetLayer = null;
+
+        // Find layer that matches this component type (by name, description, or responsibility)
+        foreach (var layer in activePattern.Layers)
+        {
+            if (layer.Name.ToLowerInvariant().Contains(typeLower) ||
+                layer.Description.ToLowerInvariant().Contains(typeLower) ||
+                layer.Responsibility.ToLowerInvariant().Contains(typeLower))
+            {
+                targetLayer = layer;
+                break;
+            }
+        }
+
+        if (targetLayer is null)
+        {
+            var noLayerResponse = new FilePathSuggestionResponse(
+                name,
+                componentType,
+                null,
+                null,
+                [],
+                $"No layer found for component type '{componentType}'");
+
+            return JsonSerializer.Serialize(noLayerResponse, JsonOptions);
+        }
+
+        // Build suggested path
+        var layerPath = targetLayer.Name.Replace(" ", "");
+        var subFolder = componentType.EndsWith("s") ? componentType : componentType + "s"; // Pluralize
+        var suggestedPath = $"src/{layerPath}/{subFolder}/{name}.cs";
+
+        var response = new FilePathSuggestionResponse(
+            name,
+            componentType,
+            suggestedPath,
+            new FilePathLayerInfo(targetLayer.Name, targetLayer.Responsibility),
+            [
+                $"src/{layerPath}/{name}.cs",
+                $"src/{layerPath}/{subFolder}/{name}.cs",
+                $"{layerPath}/{subFolder}/{name}.cs"
+            ],
+            null);
+
+        return JsonSerializer.Serialize(response, JsonOptions);
+    }
+
+    /// <summary>
+    /// Checks if a dependency between layers is allowed.
+    /// </summary>
+    public async Task<string> CheckDependency(string fromLayer, string toLayer)
+    {
+        var activePattern = await architecturePatternRepository.GetActiveAsync();
+        if (activePattern is null)
+        {
+            var noPatternResponse = new DependencyCheckResponse(
+                fromLayer,
+                toLayer,
+                null,
+                null,
+                "No active architecture pattern");
+
+            return JsonSerializer.Serialize(noPatternResponse, JsonOptions);
+        }
+
+        // Find the layer IDs
+        var sourceLayer = activePattern.Layers.FirstOrDefault(l =>
+            l.Name.Equals(fromLayer, StringComparison.OrdinalIgnoreCase));
+        var targetLayer = activePattern.Layers.FirstOrDefault(l =>
+            l.Name.Equals(toLayer, StringComparison.OrdinalIgnoreCase));
+
+        if (sourceLayer is null || targetLayer is null)
+        {
+            var notFoundResponse = new DependencyCheckResponse(
+                fromLayer,
+                toLayer,
+                null,
+                null,
+                $"Layer not found: {(sourceLayer is null ? fromLayer : toLayer)}");
+
+            return JsonSerializer.Serialize(notFoundResponse, JsonOptions);
+        }
+
+        // Check dependencies
+        await foreach (var dep in layerDependencyRepository.GetAsync(new LayerDependencyParameters(PageSize: 100, PatternId: activePattern.Id)))
+        {
+            if (dep.SourceLayerName.Equals(fromLayer, StringComparison.OrdinalIgnoreCase) &&
+                dep.TargetLayerName.Equals(toLayer, StringComparison.OrdinalIgnoreCase))
+            {
+                var explicitResponse = new DependencyCheckResponse(
+                    fromLayer,
+                    toLayer,
+                    dep.IsAllowed,
+                    "Explicit rule defined",
+                    dep.IsAllowed
+                        ? $"Dependency from {fromLayer} to {toLayer} is allowed"
+                        : $"Dependency from {fromLayer} to {toLayer} is FORBIDDEN");
+
+                return JsonSerializer.Serialize(explicitResponse, JsonOptions);
+            }
+        }
+
+        // No explicit rule - check layer order (higher can depend on lower)
+        var sourceOrder = sourceLayer.Order;
+        var targetOrder = targetLayer.Order;
+        var implicitlyAllowed = sourceOrder > targetOrder;
+
+        var implicitResponse = new DependencyCheckResponse(
+            fromLayer,
+            toLayer,
+            implicitlyAllowed,
+            "No explicit rule defined",
+            implicitlyAllowed
+                ? $"Implicitly allowed: {fromLayer} (order {sourceOrder}) can depend on {toLayer} (order {targetOrder})"
+                : $"Implicitly forbidden: {fromLayer} (order {sourceOrder}) should not depend on {toLayer} (order {targetOrder})");
+
+        return JsonSerializer.Serialize(implicitResponse, JsonOptions);
+    }
+
+    /// <summary>
+    /// Returns minimal essential context - top patterns and critical avoidances only.
+    /// </summary>
+    public async Task<string> GetQuickContext()
+    {
+        var topPatterns = new List<QuickPatternInfo>();
+        var criticalAvoidances = new List<QuickAvoidanceInfo>();
+
+        // Get top 5 active patterns
+        var patternCount = 0;
+        await foreach (var p in codingPatternRepository.GetAsync(new CodingPatternParameters(PageSize: 20)))
+        {
+            if (p.IsActive && patternCount < 5)
+            {
+                topPatterns.Add(new QuickPatternInfo(p.Name, p.Description));
+                patternCount++;
+            }
+        }
+
+        // Get all "Never" severity avoidances
+        await foreach (var a in avoidanceRuleRepository.GetAsync(new AvoidanceRuleParameters(PageSize: 50)))
+        {
+            if (a.Severity == AvoidanceSeverity.Never)
+            {
+                criticalAvoidances.Add(new QuickAvoidanceInfo(a.Name, a.Description));
+            }
+        }
+
+        // Get top 3 highest priority preferences
+        var prefs = new List<DesignPreferenceForList>();
+        await foreach (var p in designPreferenceRepository.GetAsync(new DesignPreferenceParameters(PageSize: 50)))
+        {
+            prefs.Add(p);
+        }
+
+        var topPreferences = prefs
+            .OrderByDescending(static p => p.Priority)
+            .Take(3)
+            .Select(static p => new QuickPreferenceInfo(p.Preference, p.Category))
+            .ToList();
+
+        // Get active architecture name
+        var activePattern = await architecturePatternRepository.GetActiveAsync();
+        var architectureName = activePattern?.Name ?? "None";
+
+        var response = new QuickContextResponse(
+            architectureName,
+            topPatterns,
+            criticalAvoidances,
+            topPreferences,
+            $"{topPatterns.Count} patterns, {criticalAvoidances.Count} critical rules, using {architectureName}");
+
+        return JsonSerializer.Serialize(response, JsonOptions);
+    }
 }
