@@ -1,0 +1,160 @@
+@page "/architecture/naming"
+@using BlazingSingularity.Commands
+@using Grigori.Contracts.Dtos
+@using Grigori.Contracts.Interfaces
+@using Grigori.Contracts.Parameters
+@using Grigori.Desktop.Components.Shared
+@inject INamingConventionRepository Repository
+@inject IArchitecturePatternRepository PatternRepository
+@inject IDialogService DialogService
+
+<MudText Typo="Typo.h5" Class="mb-4">Naming Conventions</MudText>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.body2">Define naming patterns for different contexts.</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" OnClick="ShowAddDialog">Add Convention</MudButton>
+</MudStack>
+
+@if (LoadDataCommand.IsLoading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_conventions.Count == 0)
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Text">No naming conventions defined yet. Click "Add Convention" to create one.</MudAlert>
+}
+else
+{
+    <MudTable Items="_conventions" Hover="true" Elevation="0" Dense="true" Filter="FilterFunc" GroupBy="_groupDefinition">
+        <ToolBarContent>
+            <MudSelect @bind-Value="_contextFilter" Label="Context" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Style="min-width: 150px;" Clearable="true">
+                @foreach (var context in _contexts)
+                {
+                    <MudSelectItem Value="context">@context</MudSelectItem>
+                }
+            </MudSelect>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Context</MudTh>
+            <MudTh>Pattern</MudTh>
+            <MudTh>Example</MudTh>
+            <MudTh>Layer</MudTh>
+            <MudTh Style="width: 100px;">Actions</MudTh>
+        </HeaderContent>
+        <GroupHeaderTemplate>
+            <MudTh colspan="5">
+                <MudText Typo="Typo.subtitle1"><strong>@context.Key</strong></MudText>
+            </MudTh>
+        </GroupHeaderTemplate>
+        <RowTemplate>
+            <MudTd DataLabel="Context"><MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@context.Context</MudChip></MudTd>
+            <MudTd DataLabel="Pattern"><code>@context.Pattern</code></MudTd>
+            <MudTd DataLabel="Example"><code style="color: var(--mud-palette-success);">@context.Example</code></MudTd>
+            <MudTd DataLabel="Layer">@(context.LayerName ?? "-")</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => ShowEditDialog(context.Id)" />
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => Delete(context.Id)" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private List<NamingConventionForList> _conventions = [];
+    private List<string> _contexts = [];
+    private List<ArchitectureLayerForList> _layers = [];
+    private string? _contextFilter;
+
+    private readonly TableGroupDefinition<NamingConventionForList> _groupDefinition = new()
+    {
+        GroupName = "Context",
+        Selector = x => x.Context
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataCommand.ExecuteAsync();
+    }
+
+    [RelayCommand]
+    private async Task LoadData()
+    {
+        _conventions = [];
+        await foreach (var item in Repository.GetAsync(new NamingConventionParameters(PageSize: 1000)))
+        {
+            _conventions.Add(item);
+        }
+        _contexts = (await Repository.GetContextsAsync()).ToList();
+
+        var activePattern = await PatternRepository.GetActiveAsync();
+        _layers = activePattern?.Layers.ToList() ?? [];
+    }
+
+    private bool FilterFunc(NamingConventionForList convention)
+    {
+        if (!string.IsNullOrWhiteSpace(_contextFilter) && convention.Context != _contextFilter)
+            return false;
+        return true;
+    }
+
+    private async Task ShowAddDialog()
+    {
+        var parameters = new DialogParameters<NamingConventionDialog>
+        {
+            { x => x.AvailableLayers, _layers }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<NamingConventionDialog>("Add Naming Convention", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadDataCommand.ExecuteAsync();
+        }
+    }
+
+    private async Task ShowEditDialog(int id)
+    {
+        var convention = await Repository.GetByIdAsync(id);
+        if (convention is null) return;
+
+        var parameters = new DialogParameters<NamingConventionDialog>
+        {
+            { x => x.Id, convention.Id },
+            { x => x.Context, convention.Context },
+            { x => x.Pattern, convention.Pattern },
+            { x => x.Example, convention.Example },
+            { x => x.Description, convention.Description },
+            { x => x.LayerId, convention.LayerId },
+            { x => x.AvailableLayers, _layers },
+            { x => x.IsEdit, true }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<NamingConventionDialog>("Edit Naming Convention", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await LoadDataCommand.ExecuteAsync();
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, "Are you sure you want to delete this naming convention?" },
+            { x => x.ButtonText, "Delete" },
+            { x => x.Color, Color.Error }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Convention", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await Repository.DeleteAsync(id);
+            await LoadDataCommand.ExecuteAsync();
+        }
+    }
+}

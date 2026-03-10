@@ -1,0 +1,296 @@
+@page "/architecture/view"
+@page "/architecture/view/{PatternId:int}"
+@using BlazingSingularity.Commands
+@using Grigori.Contracts.Dtos
+@using Grigori.Contracts.Interfaces
+@using Grigori.Contracts.Parameters
+@inject IArchitecturePatternRepository PatternRepository
+@inject ILayerDependencyRepository DependencyRepository
+@inject ICodeTemplateRepository TemplateRepository
+@inject INamingConventionRepository ConventionRepository
+@inject NavigationManager Navigation
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h5">Architecture Overview</MudText>
+    @if (_patterns.Count > 1)
+    {
+        <MudSelect @bind-Value="_selectedPatternId" Label="Pattern" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Style="min-width: 200px;">
+            @foreach (var p in _patterns)
+            {
+                <MudSelectItem Value="p.Id">@p.Name @(p.IsActive ? "(Active)" : "")</MudSelectItem>
+            }
+        </MudSelect>
+    }
+</MudStack>
+
+@if (LoadPatternsCommand.IsLoading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_pattern is null)
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Text">
+        No architecture patterns defined yet.
+        <MudLink Href="/architecture/patterns">Create one</MudLink> to get started.
+    </MudAlert>
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
+            <div>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                    <MudText Typo="Typo.h6">@_pattern.Name</MudText>
+                    @if (_pattern.IsActive)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">Active</MudChip>
+                    }
+                </MudStack>
+                <MudText Typo="Typo.body1">@_pattern.Description</MudText>
+            </div>
+            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Href="@($"/architecture/patterns/{_pattern.Id}")" Size="Size.Small" />
+        </MudStack>
+    </MudPaper>
+
+    @if (!string.IsNullOrWhiteSpace(_pattern.Diagram))
+    {
+        <MudText Typo="Typo.h6" Class="mb-2">Diagram</MudText>
+        <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true" Style="background: var(--mud-palette-background-grey);">
+            <pre style="font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace; white-space: pre; overflow-x: auto; margin: 0; line-height: 1.4;">@_pattern.Diagram</pre>
+        </MudPaper>
+    }
+
+    @if (_pattern.Layers.Count > 0)
+    {
+        <MudText Typo="Typo.h6" Class="mb-2">Layers</MudText>
+        <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+            <MudStack Spacing="0">
+                @foreach (var layer in _pattern.Layers.OrderBy(l => l.Order))
+                {
+                    <div class="layer-item pa-3 @(layer != _pattern.Layers.OrderBy(l => l.Order).Last() ? "border-bottom" : "")">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-1">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary">@layer.Order</MudChip>
+                            <MudText Typo="Typo.subtitle1"><strong>@layer.Name</strong></MudText>
+                        </MudStack>
+                        <MudText Typo="Typo.body2" Class="mb-1">@layer.Description</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            <strong>Responsibility:</strong> @layer.Responsibility
+                        </MudText>
+                    </div>
+                }
+            </MudStack>
+        </MudPaper>
+    }
+
+    @if (_dependencies.Count > 0)
+    {
+        <MudText Typo="Typo.h6" Class="mb-2">Layer Dependencies</MudText>
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Success" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="mr-1" /> Allowed Dependencies
+                    </MudText>
+                    @{
+                        var allowed = _dependencies.Where(d => d.IsAllowed).ToList();
+                    }
+                    @if (allowed.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">None defined</MudText>
+                    }
+                    else
+                    {
+                        <MudStack Spacing="1">
+                            @foreach (var dep in allowed)
+                            {
+                                <MudText Typo="Typo.body2">
+                                    @dep.SourceLayerName <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" Class="mx-1" /> @dep.TargetLayerName
+                                </MudText>
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Error" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Block" Size="Size.Small" Class="mr-1" /> Forbidden Dependencies
+                    </MudText>
+                    @{
+                        var forbidden = _dependencies.Where(d => !d.IsAllowed).ToList();
+                    }
+                    @if (forbidden.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">None defined</MudText>
+                    }
+                    else
+                    {
+                        <MudStack Spacing="1">
+                            @foreach (var dep in forbidden)
+                            {
+                                <MudText Typo="Typo.body2">
+                                    @dep.SourceLayerName <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" Class="mx-1" /> @dep.TargetLayerName
+                                </MudText>
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+
+    @if (_templates.Count > 0)
+    {
+        <MudText Typo="Typo.h6" Class="mb-2">Code Templates</MudText>
+        <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+            <MudSimpleTable Dense="true" Hover="true" Elevation="0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Language</th>
+                        <th>Layer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in _templates)
+                    {
+                        <tr>
+                            <td><strong>@t.Name</strong></td>
+                            <td>@t.Category</td>
+                            <td><code>@t.Language</code></td>
+                            <td>@(t.LayerName ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    }
+
+    @if (_conventions.Count > 0)
+    {
+        <MudText Typo="Typo.h6" Class="mb-2">Naming Conventions</MudText>
+        <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+            <MudSimpleTable Dense="true" Hover="true" Elevation="0">
+                <thead>
+                    <tr>
+                        <th>Context</th>
+                        <th>Pattern</th>
+                        <th>Example</th>
+                        <th>Layer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in _conventions)
+                    {
+                        <tr>
+                            <td><MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@c.Context</MudChip></td>
+                            <td><code>@c.Pattern</code></td>
+                            <td><code style="color: var(--mud-palette-success);">@c.Example</code></td>
+                            <td>@(c.LayerName ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    }
+}
+
+<style>
+    .border-bottom {
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+    }
+</style>
+
+@code {
+    [Parameter] public int? PatternId { get; set; }
+
+    private List<ArchitecturePatternForList> _patterns = [];
+    private ArchitecturePatternForDetail? _pattern;
+    private List<LayerDependencyForList> _dependencies = [];
+    private List<CodeTemplateForList> _templates = [];
+    private List<NamingConventionForList> _conventions = [];
+
+    private int _selectedPatternId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPatternsCommand.ExecuteAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (PatternId.HasValue && _selectedPatternId != PatternId.Value)
+        {
+            _selectedPatternId = PatternId.Value;
+            await LoadPatternDetails();
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadPatterns()
+    {
+        _patterns = [];
+        await foreach (var item in PatternRepository.GetAsync(new ArchitecturePatternParameters(PageSize: 1000)))
+        {
+            _patterns.Add(item);
+        }
+
+        if (PatternId.HasValue)
+        {
+            _selectedPatternId = PatternId.Value;
+        }
+        else
+        {
+            // Default to active pattern or first
+            var activePattern = _patterns.FirstOrDefault(p => p.IsActive) ?? _patterns.FirstOrDefault();
+            _selectedPatternId = activePattern?.Id ?? 0;
+        }
+
+        await LoadPatternDetails();
+    }
+
+    private async Task LoadPatternDetails()
+    {
+        if (_selectedPatternId <= 0)
+        {
+            _pattern = null;
+            return;
+        }
+
+        _pattern = await PatternRepository.GetByIdAsync(_selectedPatternId);
+        if (_pattern is not null)
+        {
+            _dependencies = [];
+            await foreach (var item in DependencyRepository.GetAsync(new LayerDependencyParameters(PageSize: 1000, PatternId: _selectedPatternId)))
+            {
+                _dependencies.Add(item);
+            }
+        }
+
+        _templates = [];
+        await foreach (var item in TemplateRepository.GetAsync(new CodeTemplateParameters(PageSize: 1000)))
+        {
+            _templates.Add(item);
+        }
+
+        _conventions = [];
+        await foreach (var item in ConventionRepository.GetAsync(new NamingConventionParameters(PageSize: 1000)))
+        {
+            _conventions.Add(item);
+        }
+    }
+
+    private int SelectedPatternId
+    {
+        get => _selectedPatternId;
+        set
+        {
+            if (_selectedPatternId != value)
+            {
+                _selectedPatternId = value;
+                Navigation.NavigateTo($"/architecture/view/{value}");
+            }
+        }
+    }
+}

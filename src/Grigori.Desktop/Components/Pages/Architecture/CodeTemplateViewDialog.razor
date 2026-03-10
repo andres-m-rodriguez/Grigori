@@ -1,0 +1,31 @@
+@using Grigori.Contracts.Dtos
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body2">@Template.Description</MudText>
+            <MudStack Row="true" Spacing="2">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info">@Template.Language</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@Template.Category</MudChip>
+                @if (!string.IsNullOrEmpty(Template.LayerName))
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Secondary">@Template.LayerName</MudChip>
+                }
+            </MudStack>
+            <MudDivider />
+            <pre style="font-family: monospace; white-space: pre; overflow-x: auto; background: var(--mud-palette-surface); padding: 16px; border-radius: 4px; max-height: 400px; overflow-y: auto;">@Template.Template</pre>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public CodeTemplateForDetail Template { get; set; } = null!;
+
+    private void Close() => MudDialog.Close();
+}

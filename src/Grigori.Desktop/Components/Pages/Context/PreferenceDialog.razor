@@ -1,0 +1,59 @@
+@using Grigori.Contracts.Dtos
+@using Grigori.Contracts.Interfaces
+@inject IDesignPreferenceRepository Repository
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="Preference" Label="Preference" Required="true" Variant="Variant.Outlined" Lines="2"
+                          HelperText="e.g., Prefer composition over inheritance" />
+            <MudTextField @bind-Value="Category" Label="Category" Required="true" Variant="Variant.Outlined"
+                          HelperText="e.g., Architecture, API Design, UI" />
+            <MudTextField @bind-Value="Rationale" Label="Rationale (optional)" Variant="Variant.Outlined" Lines="2"
+                          HelperText="Why this preference exists" />
+            <MudNumericField @bind-Value="Priority" Label="Priority" Variant="Variant.Outlined" Min="0" Max="10"
+                             HelperText="0-10, higher = more important" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!IsValid)">
+            @(IsEdit ? "Update" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public int? Id { get; set; }
+    [Parameter] public string Category { get; set; } = "";
+    [Parameter] public string Preference { get; set; } = "";
+    [Parameter] public string? Rationale { get; set; }
+    [Parameter] public int Priority { get; set; } = 5;
+    [Parameter] public bool IsEdit { get; set; }
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(Category) &&
+                            !string.IsNullOrWhiteSpace(Preference);
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        if (!IsValid) return;
+
+        if (IsEdit && Id.HasValue)
+        {
+            var dto = new DesignPreferenceForUpdate(Category, Preference, Rationale, Priority);
+            await Repository.UpdateAsync(Id.Value, dto);
+        }
+        else
+        {
+            var dto = new DesignPreferenceForCreate(Category, Preference, Rationale, Priority);
+            await Repository.CreateAsync(dto);
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

@@ -1,0 +1,75 @@
+@using Grigori.Contracts.Dtos
+@using Grigori.Contracts.Interfaces
+@inject ICodeTemplateRepository Repository
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="Name" Label="Name" Required="true" Variant="Variant.Outlined"
+                          HelperText="e.g., Repository Pattern, API Endpoint" />
+            <MudTextField @bind-Value="Description" Label="Description" Required="true" Variant="Variant.Outlined" Lines="2" />
+            <MudStack Row="true" Spacing="2">
+                <MudTextField @bind-Value="Language" Label="Language" Required="true" Variant="Variant.Outlined"
+                              HelperText="e.g., csharp, typescript" Style="flex: 1;" />
+                <MudTextField @bind-Value="Category" Label="Category" Required="true" Variant="Variant.Outlined"
+                              HelperText="e.g., Repository, Endpoint, DTO" Style="flex: 1;" />
+            </MudStack>
+            <MudSelect @bind-Value="LayerId" Label="Layer (optional)" Variant="Variant.Outlined" Clearable="true"
+                       HelperText="Architecture layer this template belongs to">
+                @foreach (var layer in AvailableLayers)
+                {
+                    <MudSelectItem Value="@((int?)layer.Id)">@layer.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="Template" Label="Template" Required="true" Variant="Variant.Outlined" Lines="15"
+                          HelperText="Use {{placeholders}} for variables, e.g., {{EntityName}}" Style="font-family: monospace;" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!IsValid)">
+            @(IsEdit ? "Update" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public int? Id { get; set; }
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public string Description { get; set; } = "";
+    [Parameter] public string Language { get; set; } = "";
+    [Parameter] public string Category { get; set; } = "";
+    [Parameter] public string Template { get; set; } = "";
+    [Parameter] public int? LayerId { get; set; }
+    [Parameter] public List<ArchitectureLayerForList> AvailableLayers { get; set; } = [];
+    [Parameter] public bool IsEdit { get; set; }
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(Name) &&
+                            !string.IsNullOrWhiteSpace(Description) &&
+                            !string.IsNullOrWhiteSpace(Language) &&
+                            !string.IsNullOrWhiteSpace(Category) &&
+                            !string.IsNullOrWhiteSpace(Template);
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        if (!IsValid) return;
+
+        if (IsEdit && Id.HasValue)
+        {
+            var dto = new CodeTemplateForUpdate(Name, Description, Language, Category, Template, LayerId);
+            await Repository.UpdateAsync(Id.Value, dto);
+        }
+        else
+        {
+            var dto = new CodeTemplateForCreate(Name, Description, Language, Category, Template, LayerId);
+            await Repository.CreateAsync(dto);
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

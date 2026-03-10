@@ -1,212 +1,118 @@
 # Grigori
 
-**Semantic code search and AI-aware codebase intelligence for .NET**
+A desktop application for managing coding context that AI assistants can access via MCP (Model Context Protocol).
 
-Grigori provides AI assistants with deep contextual awareness of software projects using embeddings, semantic search, and Model Context Protocol (MCP) integration. Index your codebase once, then let AI tools find exactly what they need.
+## Overview
+
+Grigori helps you define and organize your coding standards, architecture patterns, and development preferences in a structured way. It runs a local MCP server that AI coding assistants (like Claude Code) can connect to, giving them access to your personalized coding context.
 
 ## Features
 
-- **Semantic Search** - Find code by meaning, not just keywords. Uses all-MiniLM-L6-v2 embeddings for accurate contextual matching
-- **Fast Vector Search** - HNSW algorithm provides 50-100x speedup over linear search on large codebases
-- **MCP Integration** - First-class support for Claude and other AI assistants via Model Context Protocol
-- **Language-Aware Chunking** - Smart code splitting that preserves semantic context (C# support, extensible)
-- **Multiple Deployment Modes** - Run locally via stdio, as HTTP server, or in Docker
-- **Interactive Dashboard** - Blazor-based web UI for searching and managing your index
-- **Native AOT CLI** - Lightweight CLI tool for remote indexing operations
+### Coding Context
+- **Coding Patterns** - Document patterns you use consistently (e.g., "Repository Pattern", "CQRS")
+- **Design Preferences** - Define your coding style choices with rationale and priority
+- **Avoidance Rules** - Specify patterns and practices to avoid, with severity levels
 
-## Quick Start
+### Architecture Context
+- **Architecture Patterns** - Define layered architectures with ASCII diagrams
+- **Layer Dependencies** - Specify allowed and forbidden dependencies between layers
+- **Code Templates** - Reusable code templates with placeholders for scaffolding
+- **Naming Conventions** - Document naming patterns for different contexts (DTOs, repositories, etc.)
 
-### Docker (Recommended)
+### MCP Integration
+- Built-in MCP server exposes 40+ tools for reading and writing context
+- Connect from Claude Code, Cursor, or any MCP-compatible client
+- AI assistants can query your coding standards while helping you code
+
+## Getting Started
+
+### Prerequisites
+- .NET 10 SDK
+- Windows, macOS, or Linux (via MAUI)
+
+### Build & Run
 
 ```bash
-# Pull and run
-docker run -d -p 5151:5150 -v grigori-data:/data ghcr.io/your-org/grigori:latest
+# Clone the repository
+git clone https://github.com/andres-m-rodriguez/Grigori.git
+cd Grigori
 
-# Index a project
-curl -X POST http://localhost:5151/api/index \
-  -H "Content-Type: application/json" \
-  -d '{"path": "/path/to/project"}'
+# Build
+dotnet build
 
-# Search
-curl "http://localhost:5151/api/search?query=authentication+logic"
+# Run the desktop app
+dotnet run --project src/Grigori.Desktop
 ```
 
-### With Claude Code
+### Connect from Claude Code
 
-Add to your MCP configuration:
+Add to your Claude Code MCP settings:
 
 ```json
 {
   "mcpServers": {
     "grigori": {
-      "command": "dotnet",
-      "args": ["run", "--project", "src/Grigori.Mcp", "--", "--mcp"]
+      "url": "http://localhost:3001/sse"
     }
   }
 }
 ```
 
-Then use in Claude:
-```
-Search for code that handles user authentication
-```
+## MCP Tools
 
-### From Source
+### Coding Context Tools
+| Tool | Description |
+|------|-------------|
+| `get_coding_context` | Get complete coding context as markdown |
+| `get_coding_patterns` | Get all coding patterns as JSON |
+| `get_design_preferences` | Get all design preferences as JSON |
+| `get_avoidance_rules` | Get all avoidance rules as JSON |
+| `search_context` | Search across all context for a keyword |
+| `add_coding_pattern` | Add a new coding pattern |
+| `add_design_preference` | Add a new design preference |
+| `add_avoidance_rule` | Add a new avoidance rule |
 
-```bash
-# Clone and build
-git clone https://github.com/your-org/grigori.git
-cd grigori
-dotnet build
+### Architecture Context Tools
+| Tool | Description |
+|------|-------------|
+| `get_architecture_context` | Get complete architecture context as markdown |
+| `get_architecture_patterns` | Get all architecture patterns |
+| `get_active_architecture_pattern` | Get the currently active pattern |
+| `add_architecture_pattern` | Add a new architecture pattern |
+| `add_architecture_layer` | Add a layer to a pattern |
+| `add_layer_dependency` | Define allowed/forbidden dependencies |
+| `get_code_templates` | Get all code templates |
+| `add_code_template` | Add a new code template |
+| `get_naming_conventions` | Get all naming conventions |
+| `add_naming_convention` | Add a new naming convention |
 
-# Run the server with dashboard
-dotnet run --project src/Grigori.Mcp -- --server --dashboard
-
-# Access dashboard at http://localhost:5150
-```
-
-## Architecture
+## Project Structure
 
 ```
 src/
-├── Grigori.Cli/           # Native AOT CLI tool
-├── Grigori.Contracts/     # Interfaces and DTOs
-├── Grigori.Database/      # SQLite models and context
-├── Grigori.DataAccess/    # Repository pattern implementation
-├── Grigori.Infrastructure/# Core logic (embeddings, chunking, indexing)
-└── Grigori.Mcp/           # Web server, MCP endpoints, Dashboard
+├── Grigori.Desktop/        # MAUI Blazor Hybrid desktop app
+│   ├── Components/         # Blazor pages and components
+│   └── Mcp/               # MCP server integration
+├── Grigori.Contracts/      # DTOs and repository interfaces
+├── Grigori.DataAccess/     # Repository implementations
+├── Grigori.Database/       # EF Core DbContext and models
+└── Grigori.Common.Pagination/  # Cursor-based pagination
 ```
 
-### Technology Stack
+## Technology Stack
 
-- **.NET 10** - Latest framework
-- **Blazor Server + MudBlazor** - Interactive dashboard UI
-- **SQLite** - Persistent storage for chunks and embeddings
-- **ONNX Runtime** - Local embedding generation (all-MiniLM-L6-v2, 384 dimensions)
-- **HNSW** - Hierarchical Navigable Small World for approximate nearest neighbor search
-- **Model Context Protocol** - AI assistant integration
+- **.NET 10** - Latest .NET runtime
+- **MAUI Blazor Hybrid** - Cross-platform desktop UI
+- **MudBlazor** - Material Design component library
+- **SQLite** - Local database storage
+- **Entity Framework Core** - ORM
+- **MinimalMcp** - MCP server implementation
+- **BlazingSingularity** - Async command state management
 
-## Configuration
+## Export
 
-Configuration via `appsettings.json` or environment variables:
-
-```json
-{
-  "Grigori": {
-    "EmbeddingProvider": "onnx",
-    "OnnxModelPath": "models/all-MiniLM-L6-v2.onnx",
-    "HnswM": 16,
-    "HnswEfConstruction": 200,
-    "HnswEfSearch": 50,
-    "SupportedExtensions": [".cs", ".ts", ".js", ".py", ".go", ".rs", ".java", ".tsx", ".jsx"],
-    "ExcludedPatterns": ["**/obj/**", "**/bin/**", "**/node_modules/**", "**/.git/**"]
-  }
-}
-```
-
-## Server Modes
-
-| Mode | Command | Use Case |
-|------|---------|----------|
-| `--mcp` | Stdio transport | Local Claude Code integration |
-| `--mcp-http` | HTTP/SSE transport | Remote AI clients |
-| `--server` | HTTP API only | Containerized deployment |
-| `--dashboard` | Dashboard + API | Interactive use |
-
-## MCP Tools
-
-When integrated with an AI assistant, Grigori exposes:
-
-- **search_code** - Semantic search across indexed code
-- **index** - Index directories or files
-- **metrics** - Performance and system metrics
-- **benchmark** - Performance testing
-
-### Search Output Modes
-
-- `full` - Complete chunk content with context
-- `compact` - Condensed results
-- `summary` - Brief overview
-- `paths` - File paths only
-
-## CLI Tool
-
-The native AOT CLI enables remote indexing:
-
-```bash
-# Build the CLI
-dotnet publish src/Grigori.Cli -c Release
-
-# Index a project to a remote server
-./grigori index ./my-project --server http://localhost:5151
-```
-
-## Docker
-
-### Images
-
-- **Slim** (`grigori:slim`) - Downloads model on first run (~400MB)
-- **Full** (`grigori:latest`) - Includes model (~1.2GB)
-
-### Docker Compose
-
-```yaml
-services:
-  grigori:
-    image: ghcr.io/your-org/grigori:latest
-    ports:
-      - "5151:5150"
-    volumes:
-      - grigori-data:/data
-      - ./projects:/projects:ro
-    environment:
-      - Grigori__EmbeddingProvider=onnx
-
-volumes:
-  grigori-data:
-```
-
-## Roadmap
-
-Planned features and improvements:
-
-- [ ] **Incremental indexing** - Only re-index changed files (#3)
-- [ ] **Multi-project management** - Project metadata and switching (#2)
-- [ ] **Dashboard search UI** - Interactive search interface (#4)
-- [ ] **API authentication** - Multi-user deployment support (#5)
-- [ ] **File watcher** - Automatic re-indexing on changes (#6)
-- [ ] **GPU acceleration** - CUDA/DirectML for faster embeddings (#7)
-- [ ] **Alternative embedding models** - Support for other models (#8)
-- [ ] **Dependency tracking** - Code dependency analysis (#16)
-
-### Future Vision: Codebase Consciousness
-
-Grigori is evolving toward a comprehensive codebase intelligence system:
-
-1. **Event Storage** - Track file changes, git commits, build results
-2. **Persistent Memory** - Remember decisions, conventions, and context
-3. **Pattern Detection** - Identify co-change patterns and recurring issues
-4. **Intelligent Briefings** - Summarize changes since last session
-
-## Contributing
-
-Contributions are welcome! Please open an issue to discuss significant changes before submitting a PR.
-
-```bash
-# Run tests
-dotnet test
-
-# Build all projects
-dotnet build
-
-# Format code
-dotnet format
-```
+The Settings page includes an export feature that generates a `CLAUDE.md`-style file from your coding context, useful for projects that don't use MCP.
 
 ## License
 
-[Add your license here]
-
----
-
-*Grigori - Giving AI assistants the context they need to help you code better.*
+MIT

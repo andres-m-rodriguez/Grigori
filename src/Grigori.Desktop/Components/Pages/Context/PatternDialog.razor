@@ -1,0 +1,63 @@
+@using Grigori.Contracts.Dtos
+@using Grigori.Contracts.Interfaces
+@inject ICodingPatternRepository Repository
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="Name" Label="Name" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="Description" Label="Description" Required="true" Variant="Variant.Outlined" Lines="2" />
+            <MudTextField @bind-Value="Category" Label="Category" Required="true" Variant="Variant.Outlined"
+                          HelperText="e.g., Architecture, Error Handling, Naming" />
+            <MudTextField @bind-Value="Example" Label="Example (optional)" Variant="Variant.Outlined" Lines="3"
+                          HelperText="Code example demonstrating this pattern" />
+            @if (IsEdit)
+            {
+                <MudSwitch @bind-Value="IsActive" Label="Active" Color="Color.Primary" />
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!IsValid)">
+            @(IsEdit ? "Update" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public int? Id { get; set; }
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public string Description { get; set; } = "";
+    [Parameter] public string Category { get; set; } = "";
+    [Parameter] public string? Example { get; set; }
+    [Parameter] public bool IsActive { get; set; } = true;
+    [Parameter] public bool IsEdit { get; set; }
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(Name) &&
+                            !string.IsNullOrWhiteSpace(Description) &&
+                            !string.IsNullOrWhiteSpace(Category);
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        if (!IsValid) return;
+
+        if (IsEdit && Id.HasValue)
+        {
+            var dto = new CodingPatternForUpdate(Name, Description, Category, Example, IsActive);
+            await Repository.UpdateAsync(Id.Value, dto);
+        }
+        else
+        {
+            var dto = new CodingPatternForCreate(Name, Description, Category, Example);
+            await Repository.CreateAsync(dto);
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}
