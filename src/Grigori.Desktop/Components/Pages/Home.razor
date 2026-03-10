@@ -1,0 +1,35 @@
+@page "/"
+
+<MudText Typo="Typo.h4" Class="mb-4">Welcome to Grigori</MudText>
+<MudText Typo="Typo.body1" Class="mb-6">Manage your coding context - patterns, preferences, and things to avoid.</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="6">
+        <MudCard Elevation="0" Outlined="true">
+            <MudCardContent>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Outlined.Code" />
+                    <MudText Typo="Typo.h6">Coding Context</MudText>
+                </MudStack>
+                <MudText Typo="Typo.body2">Define your coding patterns, design preferences, and things to avoid.</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/context">Edit Context</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        <MudCard Elevation="0" Outlined="true">
+            <MudCardContent>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Outlined.Settings" />
+                    <MudText Typo="Typo.h6">Settings</MudText>
+                </MudStack>
+                <MudText Typo="Typo.body2">Configure application settings and export your context.</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/settings">Settings</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>

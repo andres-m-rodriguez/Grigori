@@ -4,8 +4,6 @@ using Grigori.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using Pgvector;
 
 #nullable disable
 
@@ -17,230 +15,170 @@ namespace Grigori.Database.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
-                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.3");
 
-            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
-            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("Grigori.Database.Entities.ActivityLogEntity", b =>
+            modelBuilder.Entity("Grigori.Database.Models.Agent", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<string>("Arguments")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
 
-                    b.Property<string>("ActivityType")
+                    b.Property<string>("Command")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("activity_type");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("description");
-
-                    b.Property<string>("Details")
-                        .HasColumnType("text")
-                        .HasColumnName("details");
-
-                    b.Property<long>("DurationMs")
-                        .HasColumnType("bigint")
-                        .HasColumnName("duration_ms");
-
-                    b.Property<DateTime>("Timestamp")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("timestamp");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ActivityType");
-
-                    b.HasIndex("Timestamp");
-
-                    b.ToTable("activity_log");
-                });
-
-            modelBuilder.Entity("Grigori.Database.Entities.ChunkEntity", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("content");
-
-                    b.Property<string>("ContentHash")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("content_hash");
-
-                    b.Property<Vector>("Embedding")
-                        .IsRequired()
-                        .HasColumnType("vector(384)")
-                        .HasColumnName("embedding");
-
-                    b.Property<int>("EndLine")
-                        .HasColumnType("integer")
-                        .HasColumnName("end_line");
-
-                    b.Property<string>("Features")
-                        .HasColumnType("text")
-                        .HasColumnName("features");
-
-                    b.Property<string>("FilePath")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("file_path");
-
-                    b.Property<DateTime>("IndexedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("indexed_at");
-
-                    b.Property<int>("StartLine")
-                        .HasColumnType("integer")
-                        .HasColumnName("start_line");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ContentHash");
-
-                    b.HasIndex("Embedding");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Embedding"), "hnsw");
-                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Embedding"), new[] { "vector_cosine_ops" });
-
-                    b.HasIndex("FilePath");
-
-                    b.ToTable("chunks");
-                });
-
-            modelBuilder.Entity("Grigori.Database.Entities.ProjectEntity", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<int>("ChunkCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("chunk_count");
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DefaultBranch")
-                        .HasColumnType("text")
-                        .HasColumnName("default_branch");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
-                        .HasColumnType("text")
-                        .HasColumnName("description");
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
 
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("text")
-                        .HasColumnName("error_message");
+                    b.Property<string>("EnvironmentVariablesJson")
+                        .HasColumnType("TEXT");
 
-                    b.Property<int>("FileCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("file_count");
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<string>("GitHubRepoFullName")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("github_repo_full_name");
-
-                    b.Property<long>("GitHubRepoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("github_repo_id");
-
-                    b.Property<string>("Language")
-                        .HasColumnType("text")
-                        .HasColumnName("language");
-
-                    b.Property<DateTime?>("LastIndexedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_indexed_at");
-
-                    b.Property<string>("LastIndexedCommitSha")
-                        .HasColumnType("text")
-                        .HasColumnName("last_indexed_commit_sha");
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name");
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer")
-                        .HasColumnName("status");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
+                    b.Property<string>("WorkingDirectory")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GitHubRepoFullName")
-                        .IsUnique();
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("agents_name_uidx");
 
-                    b.HasIndex("GitHubRepoId");
-
-                    b.HasIndex("Status");
-
-                    b.ToTable("projects", (string)null);
+                    b.ToTable("agents", (string)null);
                 });
 
-            modelBuilder.Entity("Grigori.Database.Entities.SearchHistoryEntity", b =>
+            modelBuilder.Entity("Grigori.Database.Models.AvoidanceRule", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<bool>("CacheHit")
-                        .HasColumnType("boolean")
-                        .HasColumnName("cache_hit");
-
-                    b.Property<long>("DurationMs")
-                        .HasColumnType("bigint")
-                        .HasColumnName("duration_ms");
-
-                    b.Property<string>("Query")
+                    b.Property<string>("Category")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("query");
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
 
-                    b.Property<int>("ResultCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("result_count");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
 
-                    b.Property<DateTime>("Timestamp")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("timestamp");
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
 
-                    b.Property<bool>("UsedPgvector")
-                        .HasColumnType("boolean")
-                        .HasColumnName("used_pgvector");
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Timestamp");
+                    b.HasIndex("Category")
+                        .HasDatabaseName("avoidance_rules_category_idx");
 
-                    b.ToTable("search_history");
+                    b.HasIndex("Severity")
+                        .HasDatabaseName("avoidance_rules_severity_idx");
+
+                    b.ToTable("avoidance_rules", (string)null);
+                });
+
+            modelBuilder.Entity("Grigori.Database.Models.CodingPattern", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Example")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Category")
+                        .HasDatabaseName("coding_patterns_category_idx");
+
+                    b.ToTable("coding_patterns", (string)null);
+                });
+
+            modelBuilder.Entity("Grigori.Database.Models.DesignPreference", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Preference")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Rationale")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Category")
+                        .HasDatabaseName("design_preferences_category_idx");
+
+                    b.HasIndex("Priority")
+                        .HasDatabaseName("design_preferences_priority_idx");
+
+                    b.ToTable("design_preferences", (string)null);
                 });
 #pragma warning restore 612, 618
         }

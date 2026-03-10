@@ -1,0 +1,68 @@
+@using Grigori.Contracts.Dtos
+@using Grigori.Contracts.Interfaces
+@inject INamingConventionRepository Repository
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="Context" Label="Context" Required="true" Variant="Variant.Outlined"
+                          HelperText="e.g., DTO, Repository, Endpoint, Entity, Interface" />
+            <MudTextField @bind-Value="Pattern" Label="Pattern" Required="true" Variant="Variant.Outlined"
+                          HelperText="Use {{Entity}} as placeholder, e.g., {{Entity}}Repository" />
+            <MudTextField @bind-Value="Example" Label="Example" Required="true" Variant="Variant.Outlined"
+                          HelperText="Concrete example, e.g., UserRepository" />
+            <MudTextField @bind-Value="Description" Label="Description (optional)" Variant="Variant.Outlined" Lines="2" />
+            <MudSelect @bind-Value="LayerId" Label="Layer (optional)" Variant="Variant.Outlined" Clearable="true"
+                       HelperText="Architecture layer this convention applies to">
+                @foreach (var layer in AvailableLayers)
+                {
+                    <MudSelectItem Value="@((int?)layer.Id)">@layer.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!IsValid)">
+            @(IsEdit ? "Update" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public int? Id { get; set; }
+    [Parameter] public string Context { get; set; } = "";
+    [Parameter] public string Pattern { get; set; } = "";
+    [Parameter] public string Example { get; set; } = "";
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public int? LayerId { get; set; }
+    [Parameter] public List<ArchitectureLayerForList> AvailableLayers { get; set; } = [];
+    [Parameter] public bool IsEdit { get; set; }
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(Context) &&
+                            !string.IsNullOrWhiteSpace(Pattern) &&
+                            !string.IsNullOrWhiteSpace(Example);
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        if (!IsValid) return;
+
+        if (IsEdit && Id.HasValue)
+        {
+            var dto = new NamingConventionForUpdate(Context, Pattern, Example, Description, LayerId);
+            await Repository.UpdateAsync(Id.Value, dto);
+        }
+        else
+        {
+            var dto = new NamingConventionForCreate(Context, Pattern, Example, Description, LayerId);
+            await Repository.CreateAsync(dto);
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

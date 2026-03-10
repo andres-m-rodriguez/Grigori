@@ -1,0 +1,68 @@
+@using Grigori.Contracts.Dtos
+@using Grigori.Contracts.Interfaces
+@inject ILayerDependencyRepository Repository
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudSelect @bind-Value="SourceLayerId" Label="Source Layer" Required="true" Variant="Variant.Outlined"
+                       HelperText="The layer that has the dependency" Disabled="IsEdit">
+                @foreach (var layer in AvailableLayers)
+                {
+                    <MudSelectItem Value="layer.Id">@layer.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect @bind-Value="TargetLayerId" Label="Target Layer" Required="true" Variant="Variant.Outlined"
+                       HelperText="The layer being depended on" Disabled="IsEdit">
+                @foreach (var layer in AvailableLayers)
+                {
+                    <MudSelectItem Value="layer.Id">@layer.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSwitch @bind-Value="IsAllowed" Label="@(IsAllowed ? "Allowed" : "Forbidden")" Color="@(IsAllowed ? Color.Success : Color.Error)" />
+            <MudTextField @bind-Value="Rationale" Label="Rationale (optional)" Variant="Variant.Outlined" Lines="2"
+                          HelperText="Why is this dependency allowed or forbidden?" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!IsValid)">
+            @(IsEdit ? "Update" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public int? Id { get; set; }
+    [Parameter] public int SourceLayerId { get; set; }
+    [Parameter] public int TargetLayerId { get; set; }
+    [Parameter] public bool IsAllowed { get; set; } = true;
+    [Parameter] public string? Rationale { get; set; }
+    [Parameter] public List<ArchitectureLayerForList> AvailableLayers { get; set; } = [];
+    [Parameter] public bool IsEdit { get; set; }
+
+    private bool IsValid => SourceLayerId > 0 && TargetLayerId > 0 && SourceLayerId != TargetLayerId;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        if (!IsValid) return;
+
+        if (IsEdit && Id.HasValue)
+        {
+            var dto = new LayerDependencyForUpdate(IsAllowed, Rationale);
+            await Repository.UpdateAsync(Id.Value, dto);
+        }
+        else
+        {
+            var dto = new LayerDependencyForCreate(SourceLayerId, TargetLayerId, IsAllowed, Rationale);
+            await Repository.CreateAsync(dto);
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}
