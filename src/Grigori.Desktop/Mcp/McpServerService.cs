@@ -386,6 +386,39 @@ public sealed class McpServerService : IDisposable
             async (int id, GrigoriMcpTools tools) => await tools.DeleteNamingConvention(id)
         );
 
+        // ===== SMART CONTEXT TOOLS =====
+        // These tools reduce context window usage by returning only relevant information
+
+        mcp.AddTool(
+            "analyze_for_task",
+            "Analyze coding context for a specific task. Returns only relevant patterns, naming conventions, templates, layer info, and avoidances. Use this instead of querying multiple tools separately.",
+            async (string task, GrigoriMcpTools tools) => await tools.AnalyzeForTask(task)
+        );
+
+        mcp.AddTool(
+            "validate_naming",
+            "Validate a name against naming conventions. Returns whether the name is valid and what it should be.",
+            async (string name, string context, GrigoriMcpTools tools) => await tools.ValidateNaming(name, context)
+        );
+
+        mcp.AddTool(
+            "suggest_file_path",
+            "Suggest a file path based on architecture layers. Given a component name and type, returns the recommended path.",
+            async (string name, string componentType, GrigoriMcpTools tools) => await tools.SuggestFilePath(name, componentType)
+        );
+
+        mcp.AddTool(
+            "check_dependency",
+            "Check if a dependency between two architecture layers is allowed. Returns whether the dependency is permitted and why.",
+            async (string fromLayer, string toLayer, GrigoriMcpTools tools) => await tools.CheckDependency(fromLayer, toLayer)
+        );
+
+        mcp.AddTool(
+            "get_quick_context",
+            "Get minimal essential context - top 5 patterns, critical avoidances (Never severity), and top 3 preferences. Use this for a quick overview without loading everything.",
+            async (GrigoriMcpTools tools) => await tools.GetQuickContext()
+        );
+
         try
         {
             await mcp.RunHttpAsync(_port, cancellationToken);
