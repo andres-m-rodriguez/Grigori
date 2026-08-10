@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!--
+      Lets `dotnet run` on this project alone pick up GitHub:WebhookSecret without an env var.
+      Running through the AppHost still wins: it passes GitHub__WebhookSecret as an environment
+      variable, which outranks user secrets in the configuration order.
+    -->
+    <UserSecretsId>b2e4d7a1-9c38-4f52-8a06-3d1f7c95e408</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Features\Reviews\Grigori.Reviews.Internal\Grigori.Reviews.Internal.csproj" />
+    <ProjectReference Include="..\..\Integrations\GitHub\Grigori.Integrations.GitHub.Api\Grigori.Integrations.GitHub.Api.csproj" />
+  </ItemGroup>
+
+</Project>
