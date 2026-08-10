@@ -1,9 +1,19 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Grigori.Common.Pagination/Grigori.Common.Pagination.csproj" />
-    <Project Path="src/Grigori.Contracts/Grigori.Contracts.csproj" />
-    <Project Path="src/Grigori.DataAccess/Grigori.DataAccess.csproj" />
-    <Project Path="src/Grigori.Database/Grigori.Database.csproj" />
-    <Project Path="src/Grigori.Desktop/Grigori.Desktop.csproj" />
+    <Project Path="src/Grigori.AppHost/Grigori.AppHost.csproj" />
+  </Folder>
+  <Folder Name="/src/Apps/">
+    <Project Path="src/Apps/Grigori.Server/Grigori.Server.csproj" />
+  </Folder>
+  <Folder Name="/src/Features/" />
+  <Folder Name="/src/Features/Reviews/">
+    <Project Path="src/Features/Reviews/Grigori.Reviews.Application/Grigori.Reviews.Application.csproj" />
+    <Project Path="src/Features/Reviews/Grigori.Reviews.Contracts/Grigori.Reviews.Contracts.csproj" />
+    <Project Path="src/Features/Reviews/Grigori.Reviews.Internal/Grigori.Reviews.Internal.csproj" />
+  </Folder>
+  <Folder Name="/src/Integrations/" />
+  <Folder Name="/src/Integrations/GitHub/">
+    <Project Path="src/Integrations/GitHub/Grigori.Integrations.GitHub/Grigori.Integrations.GitHub.csproj" />
+    <Project Path="src/Integrations/GitHub/Grigori.Integrations.GitHub.Api/Grigori.Integrations.GitHub.Api.csproj" />
   </Folder>
 </Solution>
